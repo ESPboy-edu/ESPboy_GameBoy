@@ -1,36 +1,37 @@
 /*
-# ESPboy_GameBoy
-GameBoy emulator for ESPboy. 
+GameBoy emulator for ESPboy.
 
-You are able to try Nintendo retro games like SuperMario, Zelda, Pokemon, etc! 
-Pressing both side buttons, you can adjust view port (original GB screen resolution is 160х144 but it's only 128x128 window visible on ESPboy display).
+You are able to try Nintendo retro games like SuperMario, Zelda, Pokemon, etc! Pressing both side buttons, you can adjust view port (original GB screen resolution is 160х144 but it's only 128x128 window visible on ESPboy display).
 
-by RomanS for ESPboy project
-https://hackaday.io/project/164830-espboy-games-iot-stem-for-education-fun
+Peanut-GB core by deltabeard
+https://github.com/deltabeard/Peanut-GBhttps://github.com/deltabeard/Peanut-GB
 
-Peanut-GB core is used
-https://github.com/deltabeard/Peanut-GB
+Screwed to ESPboy by RomanS
+https://hackaday.io/project/164830-espboy-games-iot-stem-for-education-funhttps://hackaday.io/project/164830-espboy-games-iot-stem-for-education-fun
 
 MIT license
 */
 
 #include "Arduino.h"
+#include <ESP_EEPROM.h>
 #include <Adafruit_MCP23017.h>
 #include <Adafruit_MCP4725.h>
 #include <TFT_eSPI.h>
 #include <ESP8266WiFi.h>
 #include "ESPboyLogo.h"
-#include "rom.c"
-
 #include "peanut_gb.h"
+#include "rom.c"
+//#include "ESPboyOTA.h"
 
 //#define GB_ROM rom1   //test rom
-#define GB_ROM rom2   //super mario land
+//#define GB_ROM rom2   //super mario land
 //#define GB_ROM rom3   //tetris
 //#define GB_ROM rom4   //lemmings
 //#define GB_ROM rom5   //kirby's dream land
 //#define GB_ROM rom6   //mega man
-//#define GB_ROM rom7   //zelda
+#define GB_ROM rom7   //zelda
+
+#define CART_MEM        2960
 
 #define PAD_LEFT        0x01
 #define PAD_UP          0x02
@@ -52,11 +53,14 @@ Adafruit_MCP23017 mcp;
 Adafruit_MCP4725 dac;
 TFT_eSPI tft = TFT_eSPI(); 
 
+
 uint8_t OFFSET_X=16, OFFSET_Y=8;
+static uint8_t cartSaveFlag = 0;
+static uint32_t timeEEPROMcommete;
 
 static struct gb_s gb;
 enum gb_init_error_e ret;
-
+//ESPboyOTA* OTAobj = NULL;
 
 uint8_t inline getKeys() { return (~mcp.readGPIOAB() & 255); }
 
@@ -97,9 +101,21 @@ uint8_t gb_rom_read(struct gb_s *gb, const uint32_t addr){
   return pgm_read_byte(GB_ROM+addr);
 }
 
-uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){}
+uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
+  if (addr<CART_MEM) return EEPROM.read(addr);
+  else {Serial.print(F("Error! Out of cart memory read ")); Serial.println(addr);}
+}
 
-void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){}
+
+void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
+  if (addr<CART_MEM){
+    EEPROM.write(addr, val);
+    cartSaveFlag = 1;
+    timeEEPROMcommete = millis();
+  }
+  else {Serial.print(F("Error! Out of cart memory write "));Serial.println(addr);}
+}
+
 
 void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val){
 	const char* gb_err_str[4] = {
@@ -155,12 +171,21 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t li
 }
 
 
+
 void setup() {
   system_update_cpu_freq(SYS_CPU_160MHZ);
-  WiFi.mode(WIFI_OFF);
     
   Serial.begin(115200);
   delay(100);
+
+//EEPROM init (for game cart RAM)  
+  EEPROM.begin(CART_MEM);
+  EEPROM.write(100,1);
+  EEPROM.write(101,2);
+  EEPROM.write(102,3);
+  if(EEPROM.read(100) + EEPROM.read(101) + EEPROM.read(102) == 6)
+    Serial.println(F("\n\nEEPROM init OK"));
+  else Serial.println(F("\n\nEEPROM init FAIL"));
 
 //DAC init 
   dac.begin(0x60);
@@ -202,13 +227,17 @@ void setup() {
   tft.drawString(F("GameBoy emulator"), 20, 95);
   for (uint8_t i = 0; i<100; i++){
     dac.setVoltage(i* 10, false);
-    delay(10);
-  }
+    delay(7);}
   dac.setVoltage(4095, true);
   delay(1000);
 
 // clear screen
   tft.fillScreen(TFT_BLACK);
+
+
+// check OTA WiFi OFF
+//  if (getKeys()&PAD_ACT || getKeys()&PAD_ESC) OTAobj = new ESPboyOTA(&tft, &mcp);
+//  WiFi.mode(WIFI_OFF);
   
   ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
 
@@ -224,13 +253,18 @@ void setup() {
 
 
 void loop() {
- //static uint32_t tme;
  //static String fps;
- //tme = millis();
+ //uint32_t tme = millis();
  
    gb_run_frame(&gb);
    readkeys();
  
  //fps = 1000/(millis() - tme);
  //tft.drawString(fps + " ", 0, 120);
+ 
+  if (cartSaveFlag == 1 && millis() - timeEEPROMcommete > 5000){
+    Serial.println("Commiting!");
+    cartSaveFlag = 0;
+    EEPROM.commit();
+  }
 }
