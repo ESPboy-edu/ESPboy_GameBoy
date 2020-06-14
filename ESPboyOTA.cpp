@@ -6,15 +6,17 @@ thanks to DmitryL (Plague) for coding help,
 Corax, AlRado, Torabora, MLXXXP for tests and advices.
 */
 
+#define OTAv 14
+
 #include "ESPboyOTA.h"
 #define SOUNDPIN D3
-#define OTAv 13
 
 const uint8_t ESPboyOTA::keybOnscr[2][3][21] PROGMEM = {
  {"+1234567890abcdefghi", "jklmnopqrstuvwxyz -=", "?!@$%&*()_[]\":;.,^<E",},
  {"+1234567890ABCDEFGHI", "JKLMNOPQRSTUVWXYZ -=", "?!@$%&*()_[]\":;.,^<E",}
 };
 
+//http://script.google.com/macros/s/AKfycbxIfj1Eqi1eupe9Vmkhk0liuNrhSvM1Sx65qxocbBsd4jl0e7yj/exec
 const char PROGMEM* ESPboyOTA::hostD = "script.google.com";
 const char PROGMEM* ESPboyOTA::urlPost = "/macros/s/AKfycbxIfj1Eqi1eupe9Vmkhk0liuNrhSvM1Sx65qxocbBsd4jl0e7yj/exec";
 const uint16_t PROGMEM ESPboyOTA::httpsPort = 443;
@@ -47,7 +49,7 @@ uint8_t ESPboyOTA::keysAction() {
   uint8_t keyState = getKeys();
 
   if (keyState) {
-    //tone(SOUNDPIN, 100, 10);
+    tone(SOUNDPIN, 100, 10);
     if (!keybParam.displayMode) {
       if (keyState & OTA_PAD_LEFT && keyState & OTA_PAD_UP) {  // shift
         keybParam.shiftOn = !keybParam.shiftOn;
@@ -350,8 +352,10 @@ boolean ESPboyOTA::connectWifi() {
     printConsole(F("Last network:"), TFT_GREEN, 0, 0);
     printConsole(wificl.ssid, TFT_MAGENTA, 0, 0);
   } else {
-    wificl.ssid = "";
-    wificl.pass = "";
+    if (WiFi.SSID()==""){
+      wificl.ssid = "";
+      wificl.pass = "";
+    }
     if (scanWiFi())
       for (uint8_t i = wfList.size(); i > 0; i--) {
         String toPrint =
@@ -492,7 +496,6 @@ void ESPboyOTA::postLog(String downloadID, String downloadName) {
 
   int connectionAttempts = 0;
   while (wificl.clientD->connect(hostD, httpsPort) != 1 && connectionAttempts++ < 5)
-    ;
   if (connectionAttempts > 4) {
     printConsole(F("Server failed"), TFT_RED, 0, 0);
     delay(5000);

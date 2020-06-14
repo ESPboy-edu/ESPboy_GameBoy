@@ -21,7 +21,7 @@ MIT license
 #include "ESPboyLogo.h"
 #include "peanut_gb.h"
 #include "rom.c"
-//#include "ESPboyOTA.h"
+#include "ESPboyOTA.h"
 
 //#define GB_ROM rom1   //test rom
 //#define GB_ROM rom2   //super mario land
@@ -60,26 +60,22 @@ static uint32_t timeEEPROMcommete;
 
 static struct gb_s gb;
 enum gb_init_error_e ret;
-//ESPboyOTA* OTAobj = NULL;
+ESPboyOTA* OTAobj = NULL;
 
 uint8_t inline getKeys() { return (~mcp.readGPIOAB() & 255); }
 
 void readkeys(){
  static uint8_t nowkeys;
   nowkeys = getKeys();
-  if (nowkeys&PAD_LFT && nowkeys&PAD_RGT){
-    adjustOffset();
-  }
-  else{
-    gb.direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
-    gb.direct.joypad_bits.b = (nowkeys&PAD_ESC)?0:1;
-    gb.direct.joypad_bits.up = (nowkeys&PAD_UP)?0:1;
-    gb.direct.joypad_bits.down = (nowkeys&PAD_DOWN)?0:1;
-    gb.direct.joypad_bits.left = (nowkeys&PAD_LEFT)?0:1;
-    gb.direct.joypad_bits.right = (nowkeys&PAD_RIGHT)?0:1;
-    gb.direct.joypad_bits.start = (nowkeys&PAD_LFT)?0:1;
-    gb.direct.joypad_bits.select = (nowkeys&PAD_RGT)?0:1;
-  }
+  gb.direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
+  gb.direct.joypad_bits.b = (nowkeys&PAD_ESC)?0:1;
+  gb.direct.joypad_bits.up = (nowkeys&PAD_UP)?0:1;
+  gb.direct.joypad_bits.down = (nowkeys&PAD_DOWN)?0:1;
+  gb.direct.joypad_bits.left = (nowkeys&PAD_LEFT)?0:1;
+  gb.direct.joypad_bits.right = (nowkeys&PAD_RIGHT)?0:1;
+  gb.direct.joypad_bits.start = (nowkeys&PAD_LFT)?0:1;
+  gb.direct.joypad_bits.select = (nowkeys&PAD_RGT)?0:1;
+  if (nowkeys&PAD_LFT && nowkeys&PAD_RGT) adjustOffset();
 }
 
 void adjustOffset(){
@@ -233,11 +229,6 @@ void setup() {
 
 // clear screen
   tft.fillScreen(TFT_BLACK);
-
-
-// check OTA WiFi OFF
-//  if (getKeys()&PAD_ACT || getKeys()&PAD_ESC) OTAobj = new ESPboyOTA(&tft, &mcp);
-//  WiFi.mode(WIFI_OFF);
   
   ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
 
@@ -249,6 +240,10 @@ void setup() {
 	gb_init_lcd(&gb, &lcd_draw_line);
     gb.direct.interlace = 0;
     gb.direct.frame_skip = 1;
+
+//check OTA and if No than WiFi OFF
+  if (getKeys()&PAD_ACT || getKeys()&PAD_ESC) OTAobj = new ESPboyOTA(&tft, &mcp);
+  WiFi.mode(WIFI_OFF);
 }
 
 
