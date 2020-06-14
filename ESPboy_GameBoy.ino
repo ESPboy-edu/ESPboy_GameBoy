@@ -27,6 +27,7 @@ MIT license
 //#define GB_ROM rom1   //test rom
 #define GB_ROM rom2   //super mario land
 //#define GB_ROM rom3   //tetris
+//#define GB_ROM rom4   //lemmings
 //#define GB_ROM rom5   //kirby's dream land
 //#define GB_ROM rom6   //mega man
 //#define GB_ROM rom7   //zelda
@@ -144,7 +145,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t li
   static uint8_t x;
   static uint8_t uiBuff[128];
  // static const uint8_t palette8[] = {0x00, 0x52, 0xA5, 0xFF};
-  static const uint8_t palette8[] = {0xFF, 0x52, 0xA5, 0x00};
+  static const uint8_t palette8[] = {0xFF, 0xA5, 0x52, 0x00};
   
   if(line > OFFSET_Y && line < 128 + OFFSET_Y){
     for (x = 0; x < 128; ++x)
