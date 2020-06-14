@@ -9,10 +9,10 @@
 #include "peanut_gb.h"
 
 //#define GB_ROM rom1   //test rom
-//#define GB_ROM rom2   //super mario land
+#define GB_ROM rom2   //super mario land
 //#define GB_ROM rom3   //tetris
 //#define GB_ROM rom5   //kirby's dream land
-#define GB_ROM rom6     //mega man
+//#define GB_ROM rom6   //mega man
 //#define GB_ROM rom7   //zelda
 
 #define PAD_LEFT        0x01
@@ -40,14 +40,13 @@ uint8_t OFFSET_X=16, OFFSET_Y=8;
 static struct gb_s gb;
 enum gb_init_error_e ret;
 
-
 uint8_t inline getKeys() { return (~mcp.readGPIOAB() & 255); }
 
 void readkeys(){
  static uint8_t nowkeys;
   nowkeys = getKeys();
   if (nowkeys&PAD_LFT && nowkeys&PAD_RGT){
-    ajustOffset();
+    adjustOffset();
   }
   else{
     gb.direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
@@ -61,7 +60,7 @@ void readkeys(){
   }
 }
 
-void ajustOffset(){
+void adjustOffset(){
   static uint8_t nowkeys;
   while(1){
     nowkeys = getKeys();
@@ -70,11 +69,10 @@ void ajustOffset(){
     if (nowkeys&PAD_LEFT && OFFSET_X>0) {OFFSET_X--; gb_run_frame(&gb);}
     if (nowkeys&PAD_RIGHT && OFFSET_X<32) {OFFSET_X++; gb_run_frame(&gb);}
     if (nowkeys&PAD_ACT || nowkeys&PAD_ESC) break;
-    tft.drawString(F("Ajusting LCD"), 32, 60);
+    tft.drawString(F("Adjusting LCD"), 24, 60);
     delay(30);
   }
 };
-
 
 
 uint8_t gb_rom_read(struct gb_s *gb, const uint32_t addr){
@@ -101,11 +99,35 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 	Serial.println(val,HEX);
 }
 
+/*
+void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
+  static uint8_t x;
+  static uint16_t uiBuff[128];
+  static uint_fast8_t colNo, colTp;
+  const static uint16_t palette[3][4] ={
+      { 0x7FFF, 0x329F, 0x001F, 0x0000 }, /. OBJ0
+      { 0x7FFF, 0x3FE6, 0x0200, 0x0000 }, // OBJ1
+      { 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }  // BG
+    };
+  
+  if(line > OFFSET_Y && line < 128 + OFFSET_Y){
+    for (x = 0; x < 128; ++x){
+      colNo = pixels[x+OFFSET_X];
+      colTp = (colNo>>3)&3;
+      colNo &= 3;
+      uiBuff[x] = palette[colTp][colNo];
+    }
+    tft.pushImage(0, line-OFFSET_Y, 128, 1, uiBuff);
+  }
+}
+*/
+
 
 void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
   static uint8_t x;
   static uint8_t uiBuff[128];
-  static const uint8_t palette8[] = {0x00, 0x52, 0xA5, 0xFF};
+ // static const uint8_t palette8[] = {0x00, 0x52, 0xA5, 0xFF};
+  static const uint8_t palette8[] = {0xFF, 0x52, 0xA5, 0x00};
   
   if(line > OFFSET_Y && line < 128 + OFFSET_Y){
     for (x = 0; x < 128; ++x)
@@ -115,7 +137,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t li
 }
 
 
-void setup(void) {
+void setup() {
   system_update_cpu_freq(SYS_CPU_160MHZ);
   WiFi.mode(WIFI_OFF);
     
@@ -184,11 +206,13 @@ void setup(void) {
 
 
 void loop() {
-// static uint32_t tme;
-// static String fps;
-//  tme = millis();
-  gb_run_frame(&gb);
-  readkeys();
-//  fps = 1000/(millis() - tme);
-//  tft.drawString(fps + " ", 0, 120);
+ //static uint32_t tme;
+ //static String fps;
+ //tme = millis();
+ 
+   gb_run_frame(&gb);
+   readkeys();
+ 
+ //fps = 1000/(millis() - tme);
+ //tft.drawString(fps + " ", 0, 120);
 }
