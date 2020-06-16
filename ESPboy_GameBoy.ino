@@ -6,7 +6,7 @@ You are able to try Nintendo retro games like SuperMario, Zelda, Pokemon, etc! P
 Peanut-GB core by deltabeard
 https://github.com/deltabeard/Peanut-GBhttps://github.com/deltabeard/Peanut-GB
 
-Screwed to ESPboy by RomanS
+RomanS has screwed it to ESPboy
 https://hackaday.io/project/164830-espboy-games-iot-stem-for-education-funhttps://hackaday.io/project/164830-espboy-games-iot-stem-for-education-fun
 
 MIT license
@@ -19,8 +19,8 @@ MIT license
 #include <TFT_eSPI.h>
 #include <ESP8266WiFi.h>
 #include "ESPboyLogo.h"
-#include "peanut_gb.h"
-#include "rom.c"
+#include "peanut_gb.c"
+#include "rom.h"
 #include "ESPboyOTA.h"
 
 //#define GB_ROM rom1   //test rom
@@ -31,7 +31,12 @@ MIT license
 //#define GB_ROM rom6   //mega man
 #define GB_ROM rom7   //zelda
 
-#define CART_MEM        2960
+#define CART_MEM        2960 //16384
+int16_t cartMemOffset1;
+int16_t cartMemOffset2;
+uint8_t cartMemFlag;
+static uint8_t cartSaveFlag = 0;
+static uint32_t timeEEPROMcommete;
 
 #define PAD_LEFT        0x01
 #define PAD_UP          0x02
@@ -52,15 +57,13 @@ MIT license
 Adafruit_MCP23017 mcp;
 Adafruit_MCP4725 dac;
 TFT_eSPI tft = TFT_eSPI(); 
-
+ESPboyOTA* OTAobj = NULL;
 
 uint8_t OFFSET_X=16, OFFSET_Y=8;
-static uint8_t cartSaveFlag = 0;
-static uint32_t timeEEPROMcommete;
 
 static struct gb_s gb;
 enum gb_init_error_e ret;
-ESPboyOTA* OTAobj = NULL;
+
 
 uint8_t inline getKeys() { return (~mcp.readGPIOAB() & 255); }
 
@@ -98,18 +101,55 @@ uint8_t gb_rom_read(struct gb_s *gb, const uint32_t addr){
 }
 
 uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
-  if (addr<CART_MEM) return EEPROM.read(addr);
-  else {Serial.print(F("Error! Out of cart memory read ")); Serial.println(addr);}
+
+  if (cartMemFlag == 0) {
+     cartMemOffset1 = addr - 100; 
+     EEPROM.write(0, cartMemOffset1>>8);
+     EEPROM.write(1, cartMemOffset1 & 255);
+     EEPROM.write(CART_MEM-3, cartMemOffset1>>8);
+     EEPROM.write(CART_MEM-2, cartMemOffset1&255);
+     cartMemFlag = 1;
+     cartSaveFlag = 1;
+     timeEEPROMcommete = millis();
+   }
+
+  Serial.print("Read "); 
+  Serial.println(addr-cartMemOffset1); 
+  tft.drawString("R", 0, 0);
+  delay(0);  
+  
+  if (addr-cartMemOffset1 >0 && addr-cartMemOffset1<CART_MEM) return EEPROM.read(addr-cartMemOffset1);
+  else {
+    Serial.print(F("Error! Out of cart memory read ")); 
+    Serial.println(addr-cartMemOffset1);
+    tft.drawString("ER!", 0, 0);}
 }
 
 
 void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
-  if (addr<CART_MEM){
-    EEPROM.write(addr, val);
+  if (cartMemFlag == 0) {
+     cartMemOffset1 = addr - 100; 
+     EEPROM.write(0, cartMemOffset1>>8);
+     EEPROM.write(1, cartMemOffset1 & 255);
+     EEPROM.write(CART_MEM-3, cartMemOffset1>>8);
+     EEPROM.write(CART_MEM-2, cartMemOffset1&255);
+     cartMemFlag = 1;}
+
+  Serial.print("Write "); 
+  Serial.println(addr-cartMemOffset1); 
+  tft.drawString("W", 0, 0);
+  delay(0);
+  
+  if (addr-cartMemOffset1>0 && addr-cartMemOffset1<CART_MEM){
+    EEPROM.write(addr-cartMemOffset1, val);
     cartSaveFlag = 1;
     timeEEPROMcommete = millis();
   }
-  else {Serial.print(F("Error! Out of cart memory write "));Serial.println(addr);}
+  else {
+    Serial.print(F("Error! Out of cart memory write "));
+    Serial.println(addr-cartMemOffset1);
+    tft.drawString("EW!", 0, 0);
+    }
 }
 
 
@@ -159,8 +199,8 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t li
  // static const uint8_t palette8[] = {0x00, 0x52, 0xA5, 0xFF};
   static const uint8_t palette8[] = {0xFF, 0xA5, 0x52, 0x00};
   
-  if(line > OFFSET_Y && line < 128 + OFFSET_Y){
-    for (x = 0; x < 128; ++x)
+  if(line >= OFFSET_Y && line < 128 + OFFSET_Y){
+    for (x = 0; x < 128; x++)
       uiBuff[x] = palette8[pixels[x+OFFSET_X]&3];
     tft.pushImage(0, line-OFFSET_Y, 128, 1, uiBuff, true);
   }
@@ -174,15 +214,25 @@ void setup() {
   Serial.begin(115200);
   delay(100);
 
+
 //EEPROM init (for game cart RAM)  
   EEPROM.begin(CART_MEM);
+/*
   EEPROM.write(100,1);
   EEPROM.write(101,2);
   EEPROM.write(102,3);
   if(EEPROM.read(100) + EEPROM.read(101) + EEPROM.read(102) == 6)
     Serial.println(F("\n\nEEPROM init OK"));
   else Serial.println(F("\n\nEEPROM init FAIL"));
+*/
+  cartMemOffset1 = (EEPROM.read(0)<<8) + EEPROM.read(1);
+  cartMemOffset2 = (EEPROM.read(CART_MEM-3)<<8) + EEPROM.read(CART_MEM-2);
+  if (cartMemOffset1 == cartMemOffset2 && cartMemOffset1 != 0) cartMemFlag = 1;
+  else cartMemFlag = 0;
 
+  Serial.print("Offset1: ");  Serial.println(cartMemOffset1);
+  Serial.print("Offset2: ");  Serial.println(cartMemOffset2);
+  
 //DAC init 
   dac.begin(0x60);
   delay (100);
@@ -229,21 +279,23 @@ void setup() {
 
 // clear screen
   tft.fillScreen(TFT_BLACK);
-  
-  ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
+
+// init game boy evulator
+   ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
 
 	if(ret != GB_INIT_NO_ERROR){
 		Serial.print("Error: ");
-		Serial.println(ret);
-	}
+		Serial.println(ret);}
 
-	gb_init_lcd(&gb, &lcd_draw_line);
+	  gb_init_lcd(&gb, &lcd_draw_line);
     gb.direct.interlace = 0;
     gb.direct.frame_skip = 1;
 
 //check OTA and if No than WiFi OFF
+  delay(500);
   if (getKeys()&PAD_ACT || getKeys()&PAD_ESC) OTAobj = new ESPboyOTA(&tft, &mcp);
   WiFi.mode(WIFI_OFF);
+
 }
 
 

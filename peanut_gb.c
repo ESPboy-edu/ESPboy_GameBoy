@@ -29,7 +29,9 @@
  * is Copyright (c) 2015-2019 Lior Halphon.
  */
 
-#pragma once
+//#pragma once
+#pragma GCC optimize ("-Ofast")
+#pragma GCC push_options
 
 #include <stdint.h>	/* Required for int types */
 #include <time.h>	/* Required for tm struct */
@@ -351,8 +353,7 @@ struct gb_s
 	 * \param addr	address
 	 * \param val	value to write to address in RAM
 	 */
-	void (*gb_cart_ram_write)(struct gb_s*, const uint_fast32_t addr,
-				  const uint8_t val);
+	void (*gb_cart_ram_write)(struct gb_s*, const uint_fast32_t addr, const uint8_t val);
 
 	/**
 	 * Notify front-end of error.
@@ -367,8 +368,7 @@ struct gb_s
 	void (*gb_serial_tx)(struct gb_s*, const uint8_t tx);
 	enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*, uint8_t* rx);
 
-	struct
-	{
+	struct{
 		unsigned char	gb_halt : 1;
 		unsigned char	gb_ime : 1;
 		unsigned char	gb_bios_enable : 1;
