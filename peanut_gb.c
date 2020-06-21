@@ -415,10 +415,16 @@ struct gb_s
 	struct count_s counter;
 
 	/* TODO: Allow implementation to allocate WRAM, VRAM and Frame Buffer. */
+/*
 	uint8_t wram[WRAM_SIZE];
 	uint8_t vram[VRAM_SIZE];
 	uint8_t hram[HRAM_SIZE];
 	uint8_t oam[OAM_SIZE];
+*/
+  uint8_t *wram;
+  uint8_t *vram;
+  uint8_t *hram;
+  uint8_t *oam;
 
 	struct
 	{
@@ -3671,6 +3677,11 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	};
 	const uint8_t num_ram_banks[] = { 0, 1, 1, 4, 16, 8 };
 
+  gb->wram = (uint8_t*) malloc (sizeof(uint8_t) * WRAM_SIZE);
+  gb->vram = (uint8_t*) malloc (sizeof(uint8_t) * VRAM_SIZE); 
+  gb->hram = (uint8_t*) malloc (sizeof(uint8_t) * HRAM_SIZE);
+  gb->oam = (uint8_t*) malloc (sizeof(uint8_t) * OAM_SIZE);
+  
 	gb->gb_rom_read = gb_rom_read;
 	gb->gb_cart_ram_read = gb_cart_ram_read;
 	gb->gb_cart_ram_write = gb_cart_ram_write;

@@ -284,6 +284,15 @@ void setup() {
 // clear screen
   tft.fillScreen(TFT_BLACK);
 
+//check OTA and if No than WiFi OFF
+  delay(500);
+  if (getKeys()&PAD_ACT || getKeys()&PAD_ESC) OTAobj = new ESPboyOTA(&tft, &mcp);
+  WiFi.mode(WIFI_OFF);
+//check OTA and if No than WiFi OFF
+  delay(500);
+  if (getKeys()&PAD_ACT || getKeys()&PAD_ESC) OTAobj = new ESPboyOTA(&tft, &mcp);
+  WiFi.mode(WIFI_OFF);
+
 // init game boy evulator
    ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
 
@@ -296,11 +305,6 @@ void setup() {
     gb.direct.frame_skip = 1;
 
   Serial.println(ESP.getFreeHeap());
-
-//check OTA and if No than WiFi OFF
-  delay(500);
-  if (getKeys()&PAD_ACT || getKeys()&PAD_ESC) OTAobj = new ESPboyOTA(&tft, &mcp);
-  WiFi.mode(WIFI_OFF);
 
 }
 
