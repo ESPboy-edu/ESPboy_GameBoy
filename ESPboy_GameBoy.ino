@@ -24,12 +24,14 @@ MIT license
 #include "ESPboyOTA.h"
 
 //#define GB_ROM rom1   //test rom
-//#define GB_ROM rom2   //super mario land
+#define GB_ROM rom2   //super mario land
 //#define GB_ROM rom3   //tetris
 //#define GB_ROM rom4   //lemmings
 //#define GB_ROM rom5   //kirby's dream land
 //#define GB_ROM rom6   //mega man
-#define GB_ROM rom7   //zelda
+//#define GB_ROM rom7   //zelda
+//#define GB_ROM rom8   //prince of persia
+
 
 #define CART_MEM        2960 //16384
 int16_t cartMemOffset1;
@@ -213,7 +215,9 @@ void setup() {
     
   Serial.begin(115200);
   delay(100);
-
+  
+  Serial.println();
+  Serial.println(ESP.getFreeHeap());
 
 //EEPROM init (for game cart RAM)  
   EEPROM.begin(CART_MEM);
@@ -290,6 +294,8 @@ void setup() {
 	  gb_init_lcd(&gb, &lcd_draw_line);
     gb.direct.interlace = 0;
     gb.direct.frame_skip = 1;
+
+  Serial.println(ESP.getFreeHeap());
 
 //check OTA and if No than WiFi OFF
   delay(500);
