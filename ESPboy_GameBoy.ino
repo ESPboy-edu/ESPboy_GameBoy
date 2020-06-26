@@ -12,6 +12,9 @@ https://hackaday.io/project/164830-espboy-games-iot-stem-for-education-funhttps:
 MIT license
 */
 
+#pragma GCC optimize ("-Ofast")
+#pragma GCC push_options
+
 #include "Arduino.h"
 #include <ESP_EEPROM.h>
 #include <Adafruit_MCP23017.h>
@@ -22,14 +25,15 @@ MIT license
 #include "peanut_gb.c"
 #include "rom.h"
 #include "ESPboyOTA.h"
+#include <stdlib.h>
 
 //#define GB_ROM rom1   //test rom
-#define GB_ROM rom2   //super mario land
+//#define GB_ROM rom2   //super mario land
 //#define GB_ROM rom3   //tetris
 //#define GB_ROM rom4   //lemmings
 //#define GB_ROM rom5   //kirby's dream land
 //#define GB_ROM rom6   //mega man
-//#define GB_ROM rom7   //zelda
+#define GB_ROM rom7   //zelda
 //#define GB_ROM rom8   //prince of persia
 
 
@@ -195,7 +199,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t li
 */
 
 
-void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
+void ICACHE_RAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
   static uint8_t x;
   static uint8_t uiBuff[128];
  // static const uint8_t palette8[] = {0x00, 0x52, 0xA5, 0xFF};

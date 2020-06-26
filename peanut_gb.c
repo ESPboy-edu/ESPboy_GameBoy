@@ -34,6 +34,7 @@
 #pragma GCC push_options
 
 #include <stdint.h>	/* Required for int types */
+#include <stdlib.h>
 #include <time.h>	/* Required for tm struct */
 
 /**
