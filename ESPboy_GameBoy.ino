@@ -35,7 +35,7 @@ MIT license
 //#define GB_ROM rom6   //mega man
 #define GB_ROM rom7   //zelda
 //#define GB_ROM rom8   //prince of persia
-
+//#define GB_ROM rom9   //contra
 
 #define CART_MEM        2960 //16384
 int16_t cartMemOffset1;
