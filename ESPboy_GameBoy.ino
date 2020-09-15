@@ -22,20 +22,22 @@ MIT license
 #include <TFT_eSPI.h>
 #include <ESP8266WiFi.h>
 #include "ESPboyLogo.h"
+#include "sound.h"
 #include "peanut_gb.c"
-#include "rom.h"
 #include "ESPboyOTA.h"
-#include <stdlib.h>
+#include <sigma_delta.h>
 
-//#define GB_ROM rom1   //test rom
-//#define GB_ROM rom2   //super mario land
-//#define GB_ROM rom3   //tetris
-//#define GB_ROM rom4   //lemmings
-//#define GB_ROM rom5   //kirby's dream land
-//#define GB_ROM rom6   //mega man
-#define GB_ROM rom7   //zelda
-//#define GB_ROM rom8   //prince of persia
-//#define GB_ROM rom9   //contra
+//#include "rom_1.h"   //test rom
+//#include "rom_2.h"   //super mario land
+//#include "rom_3.h"   //tetris
+//#include "rom_4.h"   //lemmings
+//#include "rom_5.h"   //kirby's dream land
+//#include "rom_6.h"   //mega man
+#include "rom_7.h"   //zelda
+//#include "rom_8.h"   //prince of persia
+//#include "rom_9.h"   //contra
+
+#define GB_ROM  rom
 
 #define CART_MEM        2960 //16384
 int16_t cartMemOffset1;
@@ -71,6 +73,7 @@ static struct gb_s gb;
 enum gb_init_error_e ret;
 
 
+uint8_t inline getKeys() __attribute__((always_inline));
 uint8_t inline getKeys() { return (~mcp.readGPIOAB() & 255); }
 
 void readkeys(){
@@ -102,7 +105,7 @@ void adjustOffset(){
 };
 
 
-uint8_t gb_rom_read(struct gb_s *gb, const uint32_t addr){
+uint8_t ICACHE_RAM_ATTR gb_rom_read(struct gb_s *gb, const uint32_t addr){
   return pgm_read_byte(GB_ROM+addr);
 }
 
@@ -214,6 +217,22 @@ void ICACHE_RAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const
 
 
 
+volatile uint8_t sound_dac;
+
+void ICACHE_RAM_ATTR sound_ISR()
+{
+  sigmaDeltaWrite(0, sound_dac);
+/*
+  static float sound_output[2];
+  
+  audio_callback(NULL,(uint8_t*)&sound_output,sizeof(sound_output));
+
+  sound_dac = (uint8_t)(((sound_output[0]+1.0f)+(sound_output[1]+1.0f))*63.0f);*/
+  sound_dac=audio_update();
+}
+
+
+
 void setup() {
   system_update_cpu_freq(SYS_CPU_160MHZ);
     
@@ -261,11 +280,11 @@ void setup() {
 
 // Sound init and test
   pinMode(SOUNDPIN, OUTPUT);
-  tone(SOUNDPIN, 200, 100);
+  /*tone(SOUNDPIN, 200, 100);
   delay(100);
   tone(SOUNDPIN, 100, 100);
   delay(100);
-  noTone(SOUNDPIN);
+  noTone(SOUNDPIN);*/
 
 // TFT init
   mcp.pinMode(CSTFTPIN, OUTPUT);
@@ -308,6 +327,23 @@ void setup() {
     gb.direct.interlace = 0;
     gb.direct.frame_skip = 1;
 
+  //setup sound
+
+  //audio_init();
+
+  sigmaDeltaSetup(0, F_CPU / 256);
+  sigmaDeltaAttachPin(SOUNDPIN);
+  sigmaDeltaEnable();
+
+  sound_dac = 0;
+
+  noInterrupts();
+  timer1_isr_init();
+  timer1_attachInterrupt(sound_ISR);
+  timer1_enable(TIM_DIV1, TIM_EDGE, TIM_LOOP);
+  timer1_write(ESP.getCpuFreqMHz() * 1000000 / SAMPLING_RATE);//AUDIO_SAMPLE_RATE);
+  interrupts();
+  
   Serial.println(ESP.getFreeHeap());
 
 }
@@ -321,7 +357,7 @@ void loop() {
    readkeys();
  
  //fps = 1000/(millis() - tme);
- //tft.drawString(fps + " ", 0, 120);
+ //tft.drawString(fps, 0, 120);
  
   if (cartSaveFlag == 1 && millis() - timeEEPROMcommete > 5000){
     Serial.println("Commiting!");

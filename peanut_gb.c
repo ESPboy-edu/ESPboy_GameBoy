@@ -42,6 +42,7 @@
  * audio_write() functions are provided, define ENABLE_SOUND to a non-zero value
  * before including peanut_gb.h in order for these functions to be used.
  */
+#define ENABLE_SOUND 1
 #ifndef ENABLE_SOUND
 #	define ENABLE_SOUND 0
 #endif
