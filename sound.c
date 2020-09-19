@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <math.h>
 
+extern uint8_t soundFlag;
+
 // Audio output buffer
 
 //s16 AUDIO_BUFFER_L[AUDIO_BUFFER_SIZE];
@@ -508,7 +510,7 @@ u8 audio_update()
     s16 out=0;
 
     // check APU power
-    if (SO.power) 
+    if (SO.power && soundFlag) 
         {
     /*
         Channel logic and sound generation.

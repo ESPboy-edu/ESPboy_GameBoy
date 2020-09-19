@@ -28,21 +28,24 @@ MIT license
 #include <sigma_delta.h>
 
 //#include "rom_1.h"   //test rom
-//#include "rom_2.h"   //super mario land
+#include "rom_2.h"   //super mario land
 //#include "rom_3.h"   //tetris
 //#include "rom_4.h"   //lemmings
 //#include "rom_5.h"   //kirby's dream land
 //#include "rom_6.h"   //mega man
-#include "rom_7.h"   //zelda
+//#include "rom_7.h"   //zelda
 //#include "rom_8.h"   //prince of persia
 //#include "rom_9.h"   //contra
 
 #define GB_ROM  rom
 
 #define CART_MEM        2960 //16384
+#define WRITE_DELAY 2000
+
 int16_t cartMemOffset1;
 int16_t cartMemOffset2;
 uint8_t cartMemFlag;
+uint8_t soundFlag = 1;
 static uint8_t cartSaveFlag = 0;
 static uint32_t timeEEPROMcommete;
 
@@ -98,9 +101,12 @@ void adjustOffset(){
     if (nowkeys&PAD_DOWN && OFFSET_Y<16) {OFFSET_Y++; gb_run_frame(&gb);}
     if (nowkeys&PAD_LEFT && OFFSET_X>0) {OFFSET_X--; gb_run_frame(&gb);}
     if (nowkeys&PAD_RIGHT && OFFSET_X<32) {OFFSET_X++; gb_run_frame(&gb);}
-    if (nowkeys&PAD_ACT || nowkeys&PAD_ESC) break;
+    if (nowkeys&PAD_ACT) {soundFlag = !soundFlag; gb_run_frame(&gb); delay(100);}
+    if (nowkeys&PAD_ESC) break;
     tft.drawString(F("Adjusting LCD"), 24, 60);
-    delay(30);
+    if (soundFlag) tft.drawString(F("Sound ON "), 0, 0);
+    else tft.drawString(F("Sound OFF"), 0, 0);
+    delay(100);
   }
 };
 
@@ -219,16 +225,13 @@ void ICACHE_RAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const
 
 volatile uint8_t sound_dac;
 
-void ICACHE_RAM_ATTR sound_ISR()
-{
+void ICACHE_RAM_ATTR sound_ISR(){
   sigmaDeltaWrite(0, sound_dac);
+  sound_dac = audio_update();
 /*
   static float sound_output[2];
-  
   audio_callback(NULL,(uint8_t*)&sound_output,sizeof(sound_output));
-
   sound_dac = (uint8_t)(((sound_output[0]+1.0f)+(sound_output[1]+1.0f))*63.0f);*/
-  sound_dac=audio_update();
 }
 
 
@@ -359,7 +362,7 @@ void loop() {
  //fps = 1000/(millis() - tme);
  //tft.drawString(fps, 0, 120);
  
-  if (cartSaveFlag == 1 && millis() - timeEEPROMcommete > 5000){
+  if (cartSaveFlag == 1 && millis() - timeEEPROMcommete > WRITE_DELAY){
     Serial.println("Commiting!");
     cartSaveFlag = 0;
     EEPROM.commit();
