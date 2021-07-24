@@ -24,7 +24,6 @@ MIT license
 #include "ESPboyLogo.h"
 #include "sound.h"
 #include "peanut_gb.c"
-#include "ESPboyOTA.h"
 #include <sigma_delta.h>
 
 //#include "rom_1.h"   //test rom
@@ -36,18 +35,23 @@ MIT license
 //#include "rom_7.h"   //zelda
 //#include "rom_8.h"   //prince of persia
 //#include "rom_9.h"   //contra
+//#include "rom_10.h"   //Felix the cat
+//#include "rom_11.h"
 
 #define GB_ROM  rom
 
-#define CART_MEM        2960 //16384
-#define WRITE_DELAY 2000
+#define CART_MEM       2960 //16384
+#define SAVECARTOFFSET 500
+#define WRITE_DELAY    2000
 
 int16_t cartMemOffset1;
-int16_t cartMemOffset2;
 uint8_t cartMemFlag;
 uint8_t soundFlag = 1;
 static uint8_t cartSaveFlag = 0;
 static uint32_t timeEEPROMcommete;
+static int8_t paletteNo = 2;
+static int8_t paletteChangeFlag = 1;
+
 
 #define PAD_LEFT        0x01
 #define PAD_UP          0x02
@@ -68,7 +72,6 @@ static uint32_t timeEEPROMcommete;
 Adafruit_MCP23017 mcp;
 Adafruit_MCP4725 dac;
 TFT_eSPI tft = TFT_eSPI(); 
-ESPboyOTA* OTAobj = NULL;
 
 uint8_t OFFSET_X=16, OFFSET_Y=8;
 
@@ -79,7 +82,7 @@ enum gb_init_error_e ret;
 uint8_t inline getKeys() __attribute__((always_inline));
 uint8_t inline getKeys() { return (~mcp.readGPIOAB() & 255); }
 
-void readkeys(){
+void IRAM_ATTR readkeys(){
  static uint8_t nowkeys;
   nowkeys = getKeys();
   gb.direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
@@ -102,30 +105,28 @@ void adjustOffset(){
     if (nowkeys&PAD_LEFT && OFFSET_X>0) {OFFSET_X--; gb_run_frame(&gb);}
     if (nowkeys&PAD_RIGHT && OFFSET_X<32) {OFFSET_X++; gb_run_frame(&gb);}
     if (nowkeys&PAD_ACT) {soundFlag = !soundFlag; gb_run_frame(&gb); delay(100);}
+    if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0; paletteChangeFlag=1;}
+    if (nowkeys&PAD_LFT) {paletteNo--; if(paletteNo<0)paletteNo=2; paletteChangeFlag=1;}
     if (nowkeys&PAD_ESC) break;
     tft.drawString(F("Adjusting LCD"), 24, 60);
     if (soundFlag) tft.drawString(F("Sound ON "), 0, 0);
     else tft.drawString(F("Sound OFF"), 0, 0);
-    delay(100);
+    tft.drawString(F("Palette No  "), 0, 10);
+    tft.drawString((String)paletteNo, 66, 10);
+    delay(200);
   }
 };
 
 
-uint8_t ICACHE_RAM_ATTR gb_rom_read(struct gb_s *gb, const uint32_t addr){
+uint8_t IRAM_ATTR gb_rom_read(struct gb_s *gb, const uint32_t addr){
   return pgm_read_byte(GB_ROM+addr);
 }
 
 uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
 
   if (cartMemFlag == 0) {
-     cartMemOffset1 = addr - 100; 
-     EEPROM.write(0, cartMemOffset1>>8);
-     EEPROM.write(1, cartMemOffset1 & 255);
-     EEPROM.write(CART_MEM-3, cartMemOffset1>>8);
-     EEPROM.write(CART_MEM-2, cartMemOffset1&255);
+     cartMemOffset1 = addr - SAVECARTOFFSET; 
      cartMemFlag = 1;
-     cartSaveFlag = 1;
-     timeEEPROMcommete = millis();
    }
 
   Serial.print("Read "); 
@@ -135,23 +136,20 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
   
   if (addr-cartMemOffset1 >0 && addr-cartMemOffset1<CART_MEM) return EEPROM.read(addr-cartMemOffset1);
   else {
-    Serial.print(F("Error! Out of cart memory read ")); 
-    Serial.println(addr-cartMemOffset1);
+    //Serial.print(F("Error! Out of cart memory read ")); 
+    //Serial.println(addr-cartMemOffset1);
     tft.drawString("ER!", 0, 0);}
+  return(0);
 }
 
 
 void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
   if (cartMemFlag == 0) {
-     cartMemOffset1 = addr - 100; 
-     EEPROM.write(0, cartMemOffset1>>8);
-     EEPROM.write(1, cartMemOffset1 & 255);
-     EEPROM.write(CART_MEM-3, cartMemOffset1>>8);
-     EEPROM.write(CART_MEM-2, cartMemOffset1&255);
+     cartMemOffset1 = addr - SAVECARTOFFSET;
      cartMemFlag = 1;}
 
-  Serial.print("Write "); 
-  Serial.println(addr-cartMemOffset1); 
+  //Serial.print("Write "); 
+  //Serial.println(addr-cartMemOffset1); 
   tft.drawString("W", 0, 0);
   delay(0);
   
@@ -161,8 +159,8 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
     timeEEPROMcommete = millis();
   }
   else {
-    Serial.print(F("Error! Out of cart memory write "));
-    Serial.println(addr-cartMemOffset1);
+    //Serial.print(F("Error! Out of cart memory write "));
+    //Serial.println(addr-cartMemOffset1);
     tft.drawString("EW!", 0, 0);
     }
 }
@@ -184,48 +182,51 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 	Serial.println(val,HEX);
 }
 
+
 /*
-void lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
-  static uint8_t x;
-  static uint16_t uiBuff[128];
-  static uint_fast8_t colNo, colTp;
-  const static uint16_t palette[3][4] ={
-      { 0x7FFF, 0x329F, 0x001F, 0x0000 }, /. OBJ0
-      { 0x7FFF, 0x3FE6, 0x0200, 0x0000 }, // OBJ1
-      { 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }  // BG
-    };
+void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
+  static uint_fast8_t x;
+  static uint_fast8_t pixels_x;
+  static uint8_t uiBuff[128];
   
-  if(line > OFFSET_Y && line < 128 + OFFSET_Y){
-    for (x = 0; x < 128; ++x){
-      colNo = pixels[x+OFFSET_X];
-      colTp = (colNo>>3)&3;
-      colNo &= 3;
-      uiBuff[x] = palette[colTp][colNo];
-    }
-    tft.pushImage(0, line-OFFSET_Y, 128, 1, uiBuff);
+ // static const uint8_t palette8[] = {0x00, 0x52, 0xA5, 0xFF};
+  static const uint8_t palette8[] = {0xFF, 0xA5, 0x52, 0x00};
+  
+  if(line >= OFFSET_Y && line < 128 + OFFSET_Y){
+    pixels_x = OFFSET_X;
+    for (x = 0; x < 128; x++)
+      uiBuff[x] = palette8[pixels[pixels_x++]&3];
+    tft.pushImage(0, line-OFFSET_Y, 128, 1, uiBuff, true);
   }
 }
 */
 
 
-void ICACHE_RAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
-  static uint8_t x;
-  static uint8_t uiBuff[128];
- // static const uint8_t palette8[] = {0x00, 0x52, 0xA5, 0xFF};
-  static const uint8_t palette8[] = {0xFF, 0xA5, 0x52, 0x00};
+
+void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
+  static uint_fast32_t x;
+  static uint_fast32_t pixels_x;
+  static uint16_t uiBuff[128];
+  const static uint16_t palette0[4] = { 0x7FFF, 0x329F, 0x001F, 0x0000 }; // OBJ0
+  const static uint16_t palette1[4] = { 0x7FFF, 0x3FE6, 0x0200, 0x0000 }; // OBJ1
+  const static uint16_t palette2[4] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }; // BG
+  const static uint16_t *paletteN[] = {palette0, palette1, palette2};
+  static uint16_t *paletteNN;
+
+  if (paletteChangeFlag) {paletteNN = (uint16_t *)paletteN[paletteNo]; paletteChangeFlag=0;}
   
   if(line >= OFFSET_Y && line < 128 + OFFSET_Y){
+    pixels_x = OFFSET_X;
     for (x = 0; x < 128; x++)
-      uiBuff[x] = palette8[pixels[x+OFFSET_X]&3];
-    tft.pushImage(0, line-OFFSET_Y, 128, 1, uiBuff, true);
+      uiBuff[x] = paletteNN[pixels[pixels_x++]&3];
+    tft.pushImage(0, line-OFFSET_Y, 128, 1, uiBuff);
   }
 }
 
 
-
 volatile uint8_t sound_dac;
 
-void ICACHE_RAM_ATTR sound_ISR(){
+void IRAM_ATTR sound_ISR(){
   sigmaDeltaWrite(0, sound_dac);
   sound_dac = audio_update();
 /*
@@ -247,22 +248,9 @@ void setup() {
 
 //EEPROM init (for game cart RAM)  
   EEPROM.begin(CART_MEM);
-/*
-  EEPROM.write(100,1);
-  EEPROM.write(101,2);
-  EEPROM.write(102,3);
-  if(EEPROM.read(100) + EEPROM.read(101) + EEPROM.read(102) == 6)
-    Serial.println(F("\n\nEEPROM init OK"));
-  else Serial.println(F("\n\nEEPROM init FAIL"));
-*/
-  cartMemOffset1 = (EEPROM.read(0)<<8) + EEPROM.read(1);
-  cartMemOffset2 = (EEPROM.read(CART_MEM-3)<<8) + EEPROM.read(CART_MEM-2);
-  if (cartMemOffset1 == cartMemOffset2 && cartMemOffset1 != 0) cartMemFlag = 1;
-  else cartMemFlag = 0;
-
-  Serial.print("Offset1: ");  Serial.println(cartMemOffset1);
-  Serial.print("Offset2: ");  Serial.println(cartMemOffset2);
   
+  cartMemFlag = 0;
+
 //DAC init 
   dac.begin(0x60);
   delay (100);
@@ -310,14 +298,8 @@ void setup() {
 // clear screen
   tft.fillScreen(TFT_BLACK);
 
-//check OTA and if No than WiFi OFF
-  delay(500);
-  if (getKeys()&PAD_ACT || getKeys()&PAD_ESC) OTAobj = new ESPboyOTA(&tft, &mcp);
   WiFi.mode(WIFI_OFF);
-//check OTA and if No than WiFi OFF
-  delay(500);
-  if (getKeys()&PAD_ACT || getKeys()&PAD_ESC) OTAobj = new ESPboyOTA(&tft, &mcp);
-  WiFi.mode(WIFI_OFF);
+
 
 // init game boy evulator
    ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
@@ -353,14 +335,14 @@ void setup() {
 
 
 void loop() {
- //static String fps;
- //uint32_t tme = millis();
+   //static String fps;
+   //uint32_t tme = millis();
  
    gb_run_frame(&gb);
    readkeys();
  
- //fps = 1000/(millis() - tme);
- //tft.drawString(fps, 0, 120);
+   //fps = 1000/(millis() - tme);
+   //tft.drawString(fps, 0, 120);
  
   if (cartSaveFlag == 1 && millis() - timeEEPROMcommete > WRITE_DELAY){
     Serial.println("Commiting!");
