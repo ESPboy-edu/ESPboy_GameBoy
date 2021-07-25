@@ -36,10 +36,10 @@ MIT license
 
 
 //#include "GAMES/rom_1.h"  //test rom
-//#include "GAMES/rom_2.h"  //super mario land
+#include "GAMES/rom_2.h"  //super mario land
 //#include "GAMES/rom_3.h"  //tetris
 //#include "GAMES/rom_4.h"  //lemmings
-#include "GAMES/rom_5.h"  //kirby's dream land
+//#include "GAMES/rom_5.h"  //kirby's dream land
 //#include "GAMES/rom_6.h"  //mega man
 //#include "GAMES/rom_7.h"  //zelda
 //#include "GAMES/rom_8.h"  //prince of persia
@@ -75,7 +75,7 @@ static uint8_t cartSaveFlag = 0;
 static uint32_t timeEEPROMcommete;
 static int8_t paletteNo = 2;
 static int8_t paletteChangeFlag = 1;
-uint8_t offset_x=16, offset_y=8;
+uint16_t offset_x=16, offset_y=8;
 
 #define PAD_LEFT        0x01
 #define PAD_UP          0x02
@@ -239,8 +239,9 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
     pixels_x = offset_x;
     for (x = 0; x < 128; x++)
       uiBuff[x] = paletteNN[pixels[pixels_x++]&3];
-    tft.pushImage(0, line-offset_y, 128, 1, uiBuff);
-  }
+    tft.setAddrWindow(0, line-offset_y, 128, 1);
+    tft.pushPixels(uiBuff, 128);  
+   }
 }
 
 
