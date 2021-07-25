@@ -26,17 +26,26 @@ MIT license
 #include "peanut_gb.c"
 #include <sigma_delta.h>
 
-//#include "rom_1.h"   //test rom
-#include "rom_2.h"   //super mario land
-//#include "rom_3.h"   //tetris
-//#include "rom_4.h"   //lemmings
-//#include "rom_5.h"   //kirby's dream land
-//#include "rom_6.h"   //mega man
-//#include "rom_7.h"   //zelda
-//#include "rom_8.h"   //prince of persia
-//#include "rom_9.h"   //contra
-//#include "rom_10.h"   //Felix the cat
-//#include "rom_11.h"
+//#include "GAMES/rom_1.h"  //test rom
+//#include "GAMES/rom_2.h"  //super mario land
+//#include "GAMES/rom_3.h"  //tetris
+//#include "GAMES/rom_4.h"  //lemmings
+//#include "GAMES/rom_5.h"  //kirby's dream land
+//#include "GAMES/rom_6.h"  //mega man
+//#include "GAMES/rom_7.h"  //zelda
+//#include "GAMES/rom_8.h"  //prince of persia
+//#include "GAMES/rom_9.h"  //contra
+//#include "GAMES/rom_10.h" //Felix the cat
+//#include "GAMES/rom_11.h" //Pokemon
+//#include "GAMES/rom_12.h" //Castelian
+//#include "GAMES/rom_13.h" //Castelvania
+//#include "GAMES/rom_14.h" //Donkey Kong Land
+//#include "GAMES/rom_15.h" //Double dragon
+//#include "GAMES/rom_16.h" //R-type
+//#include "GAMES/rom_17.h" //Mega man III
+//#include "GAMES/rom_18.h" //R-type II
+//#include "GAMES/rom_19.h" //nemezis
+#include "GAMES/rom_20.h"   //ninja gaiden shadow
 
 #define GB_ROM  rom
 
@@ -105,8 +114,8 @@ void adjustOffset(){
     if (nowkeys&PAD_LEFT && OFFSET_X>0) {OFFSET_X--; gb_run_frame(&gb);}
     if (nowkeys&PAD_RIGHT && OFFSET_X<32) {OFFSET_X++; gb_run_frame(&gb);}
     if (nowkeys&PAD_ACT) {soundFlag = !soundFlag; gb_run_frame(&gb); delay(100);}
-    if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0; paletteChangeFlag=1;}
-    if (nowkeys&PAD_LFT) {paletteNo--; if(paletteNo<0)paletteNo=2; paletteChangeFlag=1;}
+    if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0; paletteChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
+    if (nowkeys&PAD_LFT) {paletteNo--; if(paletteNo<0)paletteNo=2; paletteChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
     if (nowkeys&PAD_ESC) break;
     tft.drawString(F("Adjusting LCD"), 24, 60);
     if (soundFlag) tft.drawString(F("Sound ON "), 0, 0);
@@ -227,8 +236,10 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
 volatile uint8_t sound_dac;
 
 void IRAM_ATTR sound_ISR(){
-  sigmaDeltaWrite(0, sound_dac);
-  sound_dac = audio_update();
+
+  if(soundFlag){
+    sigmaDeltaWrite(0, sound_dac);
+    sound_dac = audio_update();}
 /*
   static float sound_output[2];
   audio_callback(NULL,(uint8_t*)&sound_output,sizeof(sound_output));
