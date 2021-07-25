@@ -26,11 +26,20 @@ MIT license
 #include "peanut_gb.c"
 #include <sigma_delta.h>
 
+
+#define SAVE_TOKEN 0xFC
+#define SAVE_TOKEN_OFFSET 1
+#define SAVE_SOUND_OFFSET 2
+#define SAVE_PALETTE_OFFSET 3
+#define SAVE_X_OFFSET 4
+#define SAVE_Y_OFFSET 5
+
+
 //#include "GAMES/rom_1.h"  //test rom
 //#include "GAMES/rom_2.h"  //super mario land
 //#include "GAMES/rom_3.h"  //tetris
 //#include "GAMES/rom_4.h"  //lemmings
-//#include "GAMES/rom_5.h"  //kirby's dream land
+#include "GAMES/rom_5.h"  //kirby's dream land
 //#include "GAMES/rom_6.h"  //mega man
 //#include "GAMES/rom_7.h"  //zelda
 //#include "GAMES/rom_8.h"  //prince of persia
@@ -45,12 +54,18 @@ MIT license
 //#include "GAMES/rom_17.h" //Mega man III
 //#include "GAMES/rom_18.h" //R-type II
 //#include "GAMES/rom_19.h" //nemezis
-#include "GAMES/rom_20.h"   //ninja gaiden shadow
+//#include "GAMES/rom_20.h" //ninja gaiden shadow
+//#include "GAMES/rom_21.h" //spy vs spy
+//#include "GAMES/rom_22.h" //Robocop
+//#include "GAMES/rom_23.h" //Solar Striker
+//#include "GAMES/rom_26.h"   //Mortal Combat
+//#include "GAMES/rom_27.h"   //Mortal Combat 2
+
 
 #define GB_ROM  rom
 
-#define CART_MEM       2960 //16384
-#define SAVECARTOFFSET 500
+#define CART_MEM       4000
+#define SAVECARTOFFSET 300//for donkey kong land 2600 for others 300
 #define WRITE_DELAY    2000
 
 int16_t cartMemOffset1;
@@ -60,7 +75,7 @@ static uint8_t cartSaveFlag = 0;
 static uint32_t timeEEPROMcommete;
 static int8_t paletteNo = 2;
 static int8_t paletteChangeFlag = 1;
-
+uint8_t offset_x=16, offset_y=8;
 
 #define PAD_LEFT        0x01
 #define PAD_UP          0x02
@@ -81,8 +96,6 @@ static int8_t paletteChangeFlag = 1;
 Adafruit_MCP23017 mcp;
 Adafruit_MCP4725 dac;
 TFT_eSPI tft = TFT_eSPI(); 
-
-uint8_t OFFSET_X=16, OFFSET_Y=8;
 
 static struct gb_s gb;
 enum gb_init_error_e ret;
@@ -109,14 +122,14 @@ void adjustOffset(){
   static uint8_t nowkeys;
   while(1){
     nowkeys = getKeys();
-    if (nowkeys&PAD_UP && OFFSET_Y>0) {OFFSET_Y--; gb_run_frame(&gb);}
-    if (nowkeys&PAD_DOWN && OFFSET_Y<16) {OFFSET_Y++; gb_run_frame(&gb);}
-    if (nowkeys&PAD_LEFT && OFFSET_X>0) {OFFSET_X--; gb_run_frame(&gb);}
-    if (nowkeys&PAD_RIGHT && OFFSET_X<32) {OFFSET_X++; gb_run_frame(&gb);}
+    if (nowkeys&PAD_UP && offset_y>0) {offset_y--; gb_run_frame(&gb);}
+    if (nowkeys&PAD_DOWN && offset_y<16) {offset_y++; gb_run_frame(&gb);}
+    if (nowkeys&PAD_LEFT && offset_x>0) {offset_x--; gb_run_frame(&gb);}
+    if (nowkeys&PAD_RIGHT && offset_x<32) {offset_x++; gb_run_frame(&gb);}
     if (nowkeys&PAD_ACT) {soundFlag = !soundFlag; gb_run_frame(&gb); delay(100);}
     if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0; paletteChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
     if (nowkeys&PAD_LFT) {paletteNo--; if(paletteNo<0)paletteNo=2; paletteChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
-    if (nowkeys&PAD_ESC) break;
+    if (nowkeys&PAD_ESC) {saveparameters(); break;}
     tft.drawString(F("Adjusting LCD"), 24, 60);
     if (soundFlag) tft.drawString(F("Sound ON "), 0, 0);
     else tft.drawString(F("Sound OFF"), 0, 0);
@@ -138,15 +151,14 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
      cartMemFlag = 1;
    }
 
-  Serial.print("Read "); 
-  Serial.println(addr-cartMemOffset1); 
+  //Serial.print("Read "); 
+  //Serial.println(addr-cartMemOffset1); 
   tft.drawString("R", 0, 0);
-  delay(0);  
   
   if (addr-cartMemOffset1 >0 && addr-cartMemOffset1<CART_MEM) return EEPROM.read(addr-cartMemOffset1);
   else {
-    //Serial.print(F("Error! Out of cart memory read ")); 
-    //Serial.println(addr-cartMemOffset1);
+    Serial.print(F("Error! Out of cart memory read ")); 
+    Serial.println(addr-cartMemOffset1);
     tft.drawString("ER!", 0, 0);}
   return(0);
 }
@@ -157,10 +169,9 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
      cartMemOffset1 = addr - SAVECARTOFFSET;
      cartMemFlag = 1;}
 
-  //Serial.print("Write "); 
-  //Serial.println(addr-cartMemOffset1); 
+//  Serial.print("Write "); 
+//  Serial.println(addr-cartMemOffset1); 
   tft.drawString("W", 0, 0);
-  delay(0);
   
   if (addr-cartMemOffset1>0 && addr-cartMemOffset1<CART_MEM){
     EEPROM.write(addr-cartMemOffset1, val);
@@ -168,8 +179,8 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
     timeEEPROMcommete = millis();
   }
   else {
-    //Serial.print(F("Error! Out of cart memory write "));
-    //Serial.println(addr-cartMemOffset1);
+    Serial.print(F("Error! Out of cart memory write "));
+    Serial.println(addr-cartMemOffset1);
     tft.drawString("EW!", 0, 0);
     }
 }
@@ -201,11 +212,11 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
  // static const uint8_t palette8[] = {0x00, 0x52, 0xA5, 0xFF};
   static const uint8_t palette8[] = {0xFF, 0xA5, 0x52, 0x00};
   
-  if(line >= OFFSET_Y && line < 128 + OFFSET_Y){
-    pixels_x = OFFSET_X;
+  if(line >= offset_y && line < 128 + offset_y){
+    pixels_x = offset_x;
     for (x = 0; x < 128; x++)
       uiBuff[x] = palette8[pixels[pixels_x++]&3];
-    tft.pushImage(0, line-OFFSET_Y, 128, 1, uiBuff, true);
+    tft.pushImage(0, line-offset_y, 128, 1, uiBuff, true);
   }
 }
 */
@@ -224,11 +235,11 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
 
   if (paletteChangeFlag) {paletteNN = (uint16_t *)paletteN[paletteNo]; paletteChangeFlag=0;}
   
-  if(line >= OFFSET_Y && line < 128 + OFFSET_Y){
-    pixels_x = OFFSET_X;
+  if(line >= offset_y && line < 128 + offset_y){
+    pixels_x = offset_x;
     for (x = 0; x < 128; x++)
       uiBuff[x] = paletteNN[pixels[pixels_x++]&3];
-    tft.pushImage(0, line-OFFSET_Y, 128, 1, uiBuff);
+    tft.pushImage(0, line-offset_y, 128, 1, uiBuff);
   }
 }
 
@@ -247,6 +258,27 @@ void IRAM_ATTR sound_ISR(){
 }
 
 
+void loadparameters(){
+  if(EEPROM.read(CART_MEM + SAVE_TOKEN_OFFSET) != SAVE_TOKEN)
+    saveparameters();
+  else{
+    soundFlag = EEPROM.read(CART_MEM + SAVE_SOUND_OFFSET);
+    paletteNo = EEPROM.read(CART_MEM + SAVE_PALETTE_OFFSET);
+    offset_x = EEPROM.read(CART_MEM + SAVE_X_OFFSET);
+    offset_y = EEPROM.read(CART_MEM + SAVE_Y_OFFSET);
+   }  
+}
+
+
+void saveparameters(){
+  EEPROM.write(CART_MEM + SAVE_TOKEN_OFFSET, SAVE_TOKEN);
+  EEPROM.write(CART_MEM + SAVE_SOUND_OFFSET, soundFlag);
+  EEPROM.write(CART_MEM + SAVE_PALETTE_OFFSET, paletteNo);
+  EEPROM.write(CART_MEM + SAVE_X_OFFSET, offset_x);
+  EEPROM.write(CART_MEM + SAVE_Y_OFFSET, offset_y);
+  EEPROM.commit();
+}
+
 
 void setup() {
   system_update_cpu_freq(SYS_CPU_160MHZ);
@@ -258,7 +290,7 @@ void setup() {
   Serial.println(ESP.getFreeHeap());
 
 //EEPROM init (for game cart RAM)  
-  EEPROM.begin(CART_MEM);
+  EEPROM.begin(CART_MEM+5);
   
   cartMemFlag = 0;
 
@@ -342,6 +374,7 @@ void setup() {
   
   Serial.println(ESP.getFreeHeap());
 
+  loadparameters();
 }
 
 
