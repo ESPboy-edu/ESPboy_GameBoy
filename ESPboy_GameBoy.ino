@@ -36,10 +36,10 @@ MIT license
 
 
 //#include "GAMES/rom_1.h"  //test rom
-#include "GAMES/rom_2.h"  //super mario land
+//#include "GAMES/rom_2.h"  //super mario land
 //#include "GAMES/rom_3.h"  //tetris
 //#include "GAMES/rom_4.h"  //lemmings
-//#include "GAMES/rom_5.h"  //kirby's dream land
+#include "GAMES/rom_5.h"  //kirby's dream land
 //#include "GAMES/rom_6.h"  //mega man
 //#include "GAMES/rom_7.h"  //zelda
 //#include "GAMES/rom_8.h"  //prince of persia
@@ -58,8 +58,8 @@ MIT license
 //#include "GAMES/rom_21.h" //spy vs spy
 //#include "GAMES/rom_22.h" //Robocop
 //#include "GAMES/rom_23.h" //Solar Striker
-//#include "GAMES/rom_26.h"   //Mortal Combat
-//#include "GAMES/rom_27.h"   //Mortal Combat 2
+//#include "GAMES/rom_26.h" //Mortal Combat
+//#include "GAMES/rom_27.h" //Mortal Combat 2
 
 
 #define GB_ROM  rom
@@ -74,7 +74,7 @@ uint8_t soundFlag = 1;
 static uint8_t cartSaveFlag = 0;
 static uint32_t timeEEPROMcommete;
 static int8_t paletteNo = 2;
-static int8_t paletteChangeFlag = 1;
+static int8_t paletteAndOffsetChangeFlag = 1;
 uint16_t offset_x=16, offset_y=8;
 
 #define PAD_LEFT        0x01
@@ -122,14 +122,14 @@ void adjustOffset(){
   static uint8_t nowkeys;
   while(1){
     nowkeys = getKeys();
-    if (nowkeys&PAD_UP && offset_y>0) {offset_y--; gb_run_frame(&gb);}
-    if (nowkeys&PAD_DOWN && offset_y<16) {offset_y++; gb_run_frame(&gb);}
-    if (nowkeys&PAD_LEFT && offset_x>0) {offset_x--; gb_run_frame(&gb);}
-    if (nowkeys&PAD_RIGHT && offset_x<32) {offset_x++; gb_run_frame(&gb);}
+    if (nowkeys&PAD_UP && offset_y>0) {offset_y--; gb_run_frame(&gb);paletteAndOffsetChangeFlag=1;}
+    if (nowkeys&PAD_DOWN && offset_y<16) {offset_y++; gb_run_frame(&gb);paletteAndOffsetChangeFlag=1;}
+    if (nowkeys&PAD_LEFT && offset_x>0) {offset_x--; gb_run_frame(&gb);paletteAndOffsetChangeFlag=1;}
+    if (nowkeys&PAD_RIGHT && offset_x<32) {offset_x++; gb_run_frame(&gb);paletteAndOffsetChangeFlag=1;}
     if (nowkeys&PAD_ACT) {soundFlag = !soundFlag; gb_run_frame(&gb); delay(100);}
-    if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0; paletteChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
-    if (nowkeys&PAD_LFT) {paletteNo--; if(paletteNo<0)paletteNo=2; paletteChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
-    if (nowkeys&PAD_ESC) {saveparameters(); break;}
+    if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
+    if (nowkeys&PAD_LFT) {paletteNo--; if(paletteNo<0)paletteNo=2; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
+    if (nowkeys&PAD_ESC) {saveparameters(); tft.setAddrWindow(0, 0, 128, 128); break;}
     tft.drawString(F("Adjusting LCD"), 24, 60);
     if (soundFlag) tft.drawString(F("Sound ON "), 0, 0);
     else tft.drawString(F("Sound OFF"), 0, 0);
@@ -155,11 +155,14 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
   //Serial.println(addr-cartMemOffset1); 
   tft.drawString("R", 0, 0);
   
-  if (addr-cartMemOffset1 >0 && addr-cartMemOffset1<CART_MEM) return EEPROM.read(addr-cartMemOffset1);
+  if (addr-cartMemOffset1 >0 && addr-cartMemOffset1<CART_MEM){
+    tft.setAddrWindow(0, 0, 128, 128);
+    return EEPROM.read(addr-cartMemOffset1);}
   else {
     Serial.print(F("Error! Out of cart memory read ")); 
     Serial.println(addr-cartMemOffset1);
     tft.drawString("ER!", 0, 0);}
+  tft.setAddrWindow(0, 0, 128, 128);  
   return(0);
 }
 
@@ -183,6 +186,8 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
     Serial.println(addr-cartMemOffset1);
     tft.drawString("EW!", 0, 0);
     }
+
+  tft.setAddrWindow(0, 0, 128, 128);
 }
 
 
@@ -224,22 +229,29 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
 
 
 void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
-  static uint_fast32_t x;
-  static uint_fast32_t pixels_x;
+  static uint16_t x;
+  static uint16_t pixels_x;
+  static uint16_t offset_xx;
+  static uint16_t offset_yy;
+  static uint16_t offset_yyy = offset_yy+128;
   static uint16_t uiBuff[128];
   const static uint16_t palette0[4] = { 0x7FFF, 0x329F, 0x001F, 0x0000 }; // OBJ0
   const static uint16_t palette1[4] = { 0x7FFF, 0x3FE6, 0x0200, 0x0000 }; // OBJ1
   const static uint16_t palette2[4] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }; // BG
   const static uint16_t *paletteN[] = {palette0, palette1, palette2};
   static uint16_t *paletteNN;
-
-  if (paletteChangeFlag) {paletteNN = (uint16_t *)paletteN[paletteNo]; paletteChangeFlag=0;}
   
-  if(line >= offset_y && line < 128 + offset_y){
-    pixels_x = offset_x;
+  if(line >= offset_yy && line < offset_yyy){
+    if (paletteAndOffsetChangeFlag) {
+      paletteNN = (uint16_t *)paletteN[paletteNo];
+      offset_xx = offset_x;
+      offset_yy = offset_y;
+      offset_yyy = offset_yy+128;
+      paletteAndOffsetChangeFlag=0;
+    }
+    pixels_x = offset_xx;
     for (x = 0; x < 128; x++)
       uiBuff[x] = paletteNN[pixels[pixels_x++]&3];
-    tft.setAddrWindow(0, line-offset_y, 128, 1);
     tft.pushPixels(uiBuff, 128);  
    }
 }
@@ -375,6 +387,7 @@ void setup() {
   
   Serial.println(ESP.getFreeHeap());
 
+  tft.setAddrWindow(0, 0, 128, 128);
   loadparameters();
 }
 
