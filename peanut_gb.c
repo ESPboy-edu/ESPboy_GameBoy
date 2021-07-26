@@ -30,7 +30,7 @@
  */
 
 //#pragma once
-#pragma GCC optimize ("-Ofast")
+#pragma GCC optimize ("-O3")
 #pragma GCC push_options
 
 #include <stdint.h>	/* Required for int types */

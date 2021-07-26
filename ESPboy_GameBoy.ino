@@ -12,7 +12,7 @@ https://hackaday.io/project/164830-espboy-games-iot-stem-for-education-funhttps:
 MIT license
 */
 
-#pragma GCC optimize ("-Ofast")
+#pragma GCC optimize ("-O3")
 #pragma GCC push_options
 
 #include "Arduino.h"
@@ -122,14 +122,14 @@ void adjustOffset(){
   static uint8_t nowkeys;
   while(1){
     nowkeys = getKeys();
-    if (nowkeys&PAD_UP && offset_y>0) {offset_y--; gb_run_frame(&gb);paletteAndOffsetChangeFlag=1;}
-    if (nowkeys&PAD_DOWN && offset_y<16) {offset_y++; gb_run_frame(&gb);paletteAndOffsetChangeFlag=1;}
-    if (nowkeys&PAD_LEFT && offset_x>0) {offset_x--; gb_run_frame(&gb);paletteAndOffsetChangeFlag=1;}
-    if (nowkeys&PAD_RIGHT && offset_x<32) {offset_x++; gb_run_frame(&gb);paletteAndOffsetChangeFlag=1;}
-    if (nowkeys&PAD_ACT) {soundFlag = !soundFlag; gb_run_frame(&gb); delay(100);}
+    if (nowkeys&PAD_UP && offset_y>0) {offset_y--; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb);}
+    if (nowkeys&PAD_DOWN && offset_y<16) {offset_y++; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb);}
+    if (nowkeys&PAD_LEFT && offset_x>0) {offset_x--; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb);}
+    if (nowkeys&PAD_RIGHT && offset_x<32) {offset_x++; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb);}
+    if (nowkeys&PAD_ACT) {soundFlag = !soundFlag; gb_run_frame(&gb);}
     if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
     if (nowkeys&PAD_LFT) {paletteNo--; if(paletteNo<0)paletteNo=2; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
-    if (nowkeys&PAD_ESC) {saveparameters(); tft.setAddrWindow(0, 0, 128, 128); break;}
+    if (nowkeys&PAD_ESC) {saveparameters(); paletteAndOffsetChangeFlag=1; break;}
     tft.drawString(F("Adjusting LCD"), 24, 60);
     if (soundFlag) tft.drawString(F("Sound ON "), 0, 0);
     else tft.drawString(F("Sound OFF"), 0, 0);
@@ -208,47 +208,30 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 }
 
 
-/*
-void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
-  static uint_fast8_t x;
-  static uint_fast8_t pixels_x;
-  static uint8_t uiBuff[128];
-  
- // static const uint8_t palette8[] = {0x00, 0x52, 0xA5, 0xFF};
-  static const uint8_t palette8[] = {0xFF, 0xA5, 0x52, 0x00};
-  
-  if(line >= offset_y && line < 128 + offset_y){
-    pixels_x = offset_x;
-    for (x = 0; x < 128; x++)
-      uiBuff[x] = palette8[pixels[pixels_x++]&3];
-    tft.pushImage(0, line-offset_y, 128, 1, uiBuff, true);
-  }
-}
-*/
-
-
 
 void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
-  static uint16_t x;
-  static uint16_t pixels_x;
-  static uint16_t offset_xx;
-  static uint16_t offset_yy;
-  static uint16_t offset_yyy = offset_yy+128;
+  static uint32_t x;
+  static uint32_t pixels_x;
+  static uint32_t offset_xx;
+  static uint32_t offset_yy;
+  static uint32_t offset_yyy = offset_yy+128;
   static uint16_t uiBuff[128];
-  const static uint16_t palette0[4] = { 0x7FFF, 0x329F, 0x001F, 0x0000 }; // OBJ0
-  const static uint16_t palette1[4] = { 0x7FFF, 0x3FE6, 0x0200, 0x0000 }; // OBJ1
-  const static uint16_t palette2[4] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }; // BG
-  const static uint16_t *paletteN[] = {palette0, palette1, palette2};
-  static uint16_t *paletteNN;
+  const static uint32_t palette0[4] = { 0x7FFF, 0x329F, 0x001F, 0x0000 }; // OBJ0
+  const static uint32_t palette1[4] = { 0x7FFF, 0x3FE6, 0x0200, 0x0000 }; // OBJ1
+  const static uint32_t palette2[4] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }; // BG
+  const static uint32_t *paletteN[] = {palette0, palette1, palette2};
+  static uint32_t *paletteNN;
+
+   if (paletteAndOffsetChangeFlag) {
+     paletteNN = (uint32_t *)paletteN[paletteNo];
+     offset_xx = offset_x;
+     offset_yy = offset_y;
+     offset_yyy = offset_yy+128;
+     paletteAndOffsetChangeFlag=0;
+     tft.setAddrWindow(0, 0, 128, 128);
+   }
   
   if(line >= offset_yy && line < offset_yyy){
-    if (paletteAndOffsetChangeFlag) {
-      paletteNN = (uint16_t *)paletteN[paletteNo];
-      offset_xx = offset_x;
-      offset_yy = offset_y;
-      offset_yyy = offset_yy+128;
-      paletteAndOffsetChangeFlag=0;
-    }
     pixels_x = offset_xx;
     for (x = 0; x < 128; x++)
       uiBuff[x] = paletteNN[pixels[pixels_x++]&3];
