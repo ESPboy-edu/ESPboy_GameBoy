@@ -215,7 +215,7 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
   static uint32_t offset_xx;
   static uint32_t offset_yy;
   static uint32_t offset_yyy = offset_yy+128;
-  static uint16_t uiBuff[128];
+  static uint16_t uiBuff[128] __attribute__((aligned(32)));
   const static uint32_t palette0[4] = { 0x7FFF, 0x329F, 0x001F, 0x0000 }; // OBJ0
   const static uint32_t palette1[4] = { 0x7FFF, 0x3FE6, 0x0200, 0x0000 }; // OBJ1
   const static uint32_t palette2[4] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }; // BG
