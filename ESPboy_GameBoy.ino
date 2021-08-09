@@ -6,7 +6,6 @@ You are able to try Nintendo retro games like SuperMario, Zelda, Pokemon, etc! P
 Peanut-GB core by deltabeard
 https://github.com/deltabeard/Peanut-GBhttps://github.com/deltabeard/Peanut-GB
 
-RomanS has screwed it to ESPboy
 https://hackaday.io/project/164830-espboy-games-iot-stem-for-education-funhttps://hackaday.io/project/164830-espboy-games-iot-stem-for-education-fun
 
 MIT license
@@ -24,22 +23,24 @@ MIT license
 #include "ESPboyLogo.h"
 #include "sound.h"
 #include "peanut_gb.c"
+#include "LittleFS.h"
 #include <sigma_delta.h>
 
-
+#define WRITE_DELAY 5000
+#define CART_MEM 1
 #define SAVE_TOKEN 0xFC
 #define SAVE_TOKEN_OFFSET 1
 #define SAVE_SOUND_OFFSET 2
 #define SAVE_PALETTE_OFFSET 3
 #define SAVE_X_OFFSET 4
 #define SAVE_Y_OFFSET 5
-
+#define SAVE_MARKER_OFFSET 6
 
 //#include "GAMES/rom_1.h"  //test rom
-//#include "GAMES/rom_2.h"  //super mario land
+#include "GAMES/rom_2.h"  //super mario land
 //#include "GAMES/rom_3.h"  //tetris
 //#include "GAMES/rom_4.h"  //lemmings
-#include "GAMES/rom_5.h"  //kirby's dream land
+//#include "GAMES/rom_5.h"  //kirby's dream land
 //#include "GAMES/rom_6.h"  //mega man
 //#include "GAMES/rom_7.h"  //zelda
 //#include "GAMES/rom_8.h"  //prince of persia
@@ -60,22 +61,25 @@ MIT license
 //#include "GAMES/rom_23.h" //Solar Striker
 //#include "GAMES/rom_26.h" //Mortal Combat
 //#include "GAMES/rom_27.h" //Mortal Combat 2
+//#include "GAMES/rom_28.h" //Pokemon blue
+//#include "GAMES/rom_29.h" //Q-bert
+//#include "GAMES/rom_30.h" //PacMan
 
 
-#define GB_ROM  rom
+#define GB_ROM rom
 
-#define CART_MEM       4000
-#define SAVECARTOFFSET 300//for donkey kong land 2600 for others 300
-#define WRITE_DELAY    2000
+File fle;
 
-int16_t cartMemOffset1;
-uint8_t cartMemFlag;
-uint8_t soundFlag = 1;
+static uint8_t cartSave[15000];
+
+volatile uint8_t soundFlag;
+static uint8_t previousSoundFlag;
 static uint8_t cartSaveFlag = 0;
-static uint32_t timeEEPROMcommete;
+static uint32_t timeToSave;
 static int8_t paletteNo = 2;
 static int8_t paletteAndOffsetChangeFlag = 1;
 uint16_t offset_x=16, offset_y=8;
+uint8_t saveMarker = 1;
 
 #define PAD_LEFT        0x01
 #define PAD_UP          0x02
@@ -104,90 +108,110 @@ enum gb_init_error_e ret;
 uint8_t inline getKeys() __attribute__((always_inline));
 uint8_t inline getKeys() { return (~mcp.readGPIOAB() & 255); }
 
-void IRAM_ATTR readkeys(){
+void inline __attribute__((always_inline)) IRAM_ATTR readkeys(){
  static uint8_t nowkeys;
   nowkeys = getKeys();
-  gb.direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
-  gb.direct.joypad_bits.b = (nowkeys&PAD_ESC)?0:1;
-  gb.direct.joypad_bits.up = (nowkeys&PAD_UP)?0:1;
-  gb.direct.joypad_bits.down = (nowkeys&PAD_DOWN)?0:1;
-  gb.direct.joypad_bits.left = (nowkeys&PAD_LEFT)?0:1;
-  gb.direct.joypad_bits.right = (nowkeys&PAD_RIGHT)?0:1;
-  gb.direct.joypad_bits.start = (nowkeys&PAD_LFT)?0:1;
-  gb.direct.joypad_bits.select = (nowkeys&PAD_RGT)?0:1;
-  if (nowkeys&PAD_LFT && nowkeys&PAD_RGT) adjustOffset();
+  if (nowkeys&PAD_LFT && nowkeys&PAD_RGT && cartSaveFlag == 0) adjustOffset();
+  else{
+    gb.direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
+    gb.direct.joypad_bits.b = (nowkeys&PAD_ESC)?0:1;
+    gb.direct.joypad_bits.up = (nowkeys&PAD_UP)?0:1;
+    gb.direct.joypad_bits.down = (nowkeys&PAD_DOWN)?0:1;
+    gb.direct.joypad_bits.left = (nowkeys&PAD_LEFT)?0:1;
+    gb.direct.joypad_bits.right = (nowkeys&PAD_RIGHT)?0:1;
+    gb.direct.joypad_bits.start = (nowkeys&PAD_LFT)?0:1;
+    gb.direct.joypad_bits.select = (nowkeys&PAD_RGT)?0:1;}
 }
 
 void adjustOffset(){
   static uint8_t nowkeys;
+  previousSoundFlag = soundFlag;
+  soundFlag=0;
+  gb_run_frame(&gb);
+  tft.drawString(F("Adjusting LCD"), 24, 60);
+  while(getKeys()) delay(100);
   while(1){
-    nowkeys = getKeys();
-    if (nowkeys&PAD_UP && offset_y>0) {offset_y--; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb);}
-    if (nowkeys&PAD_DOWN && offset_y<16) {offset_y++; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb);}
-    if (nowkeys&PAD_LEFT && offset_x>0) {offset_x--; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb);}
-    if (nowkeys&PAD_RIGHT && offset_x<32) {offset_x++; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb);}
-    if (nowkeys&PAD_ACT) {soundFlag = !soundFlag; gb_run_frame(&gb);}
-    if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
-    if (nowkeys&PAD_LFT) {paletteNo--; if(paletteNo<0)paletteNo=2; paletteAndOffsetChangeFlag=1; gb_run_frame(&gb); gb_run_frame(&gb);}
-    if (nowkeys&PAD_ESC) {saveparameters(); paletteAndOffsetChangeFlag=1; break;}
     tft.drawString(F("Adjusting LCD"), 24, 60);
-    if (soundFlag) tft.drawString(F("Sound ON "), 0, 0);
+    tft.drawString(F("up/down/left/right"), 8, 70);
+    
+    if (previousSoundFlag) tft.drawString(F("Sound ON "), 0, 0);
     else tft.drawString(F("Sound OFF"), 0, 0);
-    tft.drawString(F("Palette No  "), 0, 10);
+    tft.drawString(F("Palette N  "), 0, 10);
     tft.drawString((String)paletteNo, 66, 10);
-    delay(200);
+    tft.drawString(F("Save marker "), 0, 20);
+    if (saveMarker) tft.drawString(F("ON"), 72, 20);
+    else tft.drawString(F("OFF"), 72, 20);
+    delay(150);
+    while(!(nowkeys = getKeys())) delay(50);
+    if (nowkeys&PAD_UP && offset_y>0) offset_y--;
+    if (nowkeys&PAD_DOWN && offset_y<16) offset_y++;
+    if (nowkeys&PAD_LEFT && offset_x>0) offset_x--;
+    if (nowkeys&PAD_RIGHT && offset_x<32) offset_x++;
+    if (nowkeys&PAD_ACT) previousSoundFlag = !previousSoundFlag;
+    if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0;}
+    if (nowkeys&PAD_LFT) {saveMarker = !saveMarker;}
+    if (nowkeys&PAD_ESC) {break;}
+
+    paletteAndOffsetChangeFlag = 1;
+    gb_run_frame(&gb);
+    gb_run_frame(&gb);
   }
+
+  paletteAndOffsetChangeFlag = 1;
+  soundFlag = previousSoundFlag;
+  saveparameters();
 };
 
 
-uint8_t IRAM_ATTR gb_rom_read(struct gb_s *gb, const uint32_t addr){
+uint8_t inline __attribute__((always_inline)) IRAM_ATTR gb_rom_read(struct gb_s *gb, const uint32_t addr){
   return pgm_read_byte(GB_ROM+addr);
 }
 
+
 uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
 
-  if (cartMemFlag == 0) {
-     cartMemOffset1 = addr - SAVECARTOFFSET; 
-     cartMemFlag = 1;
-   }
+//  Serial.print("Read "); 
+//  Serial.println(addr-cartMemOffset1); 
+  if(saveMarker){
+    tft.drawString("R", 0, 0);
+    paletteAndOffsetChangeFlag=1;}
 
-  //Serial.print("Read "); 
-  //Serial.println(addr-cartMemOffset1); 
-  tft.drawString("R", 0, 0);
-  
-  if (addr-cartMemOffset1 >0 && addr-cartMemOffset1<CART_MEM){
-    tft.setAddrWindow(0, 0, 128, 128);
-    return EEPROM.read(addr-cartMemOffset1);}
+  if (addr<15000){
+    //Serial.print("RE "); Serial.println(addr);
+    return cartSave[addr];}
   else {
-    Serial.print(F("Error! Out of cart memory read ")); 
-    Serial.println(addr-cartMemOffset1);
-    tft.drawString("ER!", 0, 0);}
-  tft.setAddrWindow(0, 0, 128, 128);  
+    if(saveMarker){
+      tft.drawString("ERROR!", 0, 0);
+      paletteAndOffsetChangeFlag=1;
+    }  
+    Serial.print("Read fail addr: "); Serial.println(addr);
+  }
   return(0);
 }
 
 
 void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
-  if (cartMemFlag == 0) {
-     cartMemOffset1 = addr - SAVECARTOFFSET;
-     cartMemFlag = 1;}
-
-//  Serial.print("Write "); 
-//  Serial.println(addr-cartMemOffset1); 
-  tft.drawString("W", 0, 0);
   
-  if (addr-cartMemOffset1>0 && addr-cartMemOffset1<CART_MEM){
-    EEPROM.write(addr-cartMemOffset1, val);
-    cartSaveFlag = 1;
-    timeEEPROMcommete = millis();
-  }
-  else {
-    Serial.print(F("Error! Out of cart memory write "));
-    Serial.println(addr-cartMemOffset1);
-    tft.drawString("EW!", 0, 0);
-    }
+  cartSaveFlag = 1;
+  timeToSave = millis(); 
 
-  tft.setAddrWindow(0, 0, 128, 128);
+ // Serial.print("Write "); 
+  //Serial.println(addr-cartMemOffset1);
+  if(saveMarker){ 
+    tft.drawString("W", 0, 0);
+    paletteAndOffsetChangeFlag=1;
+  }
+
+  if (addr<15000){
+    //Serial.print("WE "); Serial.println(addr);
+    cartSave[addr] = val;
+  }
+  else {    
+    if(saveMarker){
+      tft.drawString("ERROR!", 0, 0);
+      paletteAndOffsetChangeFlag=1;}  
+    Serial.print("Save fail addr: "); Serial.println(addr);
+  }
 }
 
 
@@ -227,8 +251,11 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
      offset_xx = offset_x;
      offset_yy = offset_y;
      offset_yyy = offset_yy+128;
-     paletteAndOffsetChangeFlag=0;
-     tft.setAddrWindow(0, 0, 128, 128);
+     tft.setAddrWindow(0, line-offset_yy, 128, 128);
+     if (line == 0){
+       paletteAndOffsetChangeFlag=0;
+       tft.setAddrWindow(0, 0, 128, 128);
+     }
    }
   
   if(line >= offset_yy && line < offset_yyy){
@@ -262,6 +289,7 @@ void loadparameters(){
     paletteNo = EEPROM.read(CART_MEM + SAVE_PALETTE_OFFSET);
     offset_x = EEPROM.read(CART_MEM + SAVE_X_OFFSET);
     offset_y = EEPROM.read(CART_MEM + SAVE_Y_OFFSET);
+    saveMarker = EEPROM.read(CART_MEM + SAVE_MARKER_OFFSET);
    }  
 }
 
@@ -269,9 +297,11 @@ void loadparameters(){
 void saveparameters(){
   EEPROM.write(CART_MEM + SAVE_TOKEN_OFFSET, SAVE_TOKEN);
   EEPROM.write(CART_MEM + SAVE_SOUND_OFFSET, soundFlag);
+  previousSoundFlag = soundFlag;
   EEPROM.write(CART_MEM + SAVE_PALETTE_OFFSET, paletteNo);
   EEPROM.write(CART_MEM + SAVE_X_OFFSET, offset_x);
   EEPROM.write(CART_MEM + SAVE_Y_OFFSET, offset_y);
+  EEPROM.write(CART_MEM + SAVE_MARKER_OFFSET, saveMarker);
   EEPROM.commit();
 }
 
@@ -284,12 +314,10 @@ void setup() {
   
   Serial.println();
   Serial.println(ESP.getFreeHeap());
-
-//EEPROM init (for game cart RAM)  
-  EEPROM.begin(CART_MEM+5);
   
-  cartMemFlag = 0;
-
+//EEPROM init (for game cart RAM)  
+  EEPROM.begin(CART_MEM+6);
+  
 //DAC init 
   dac.begin(0x60);
   delay (100);
@@ -355,6 +383,22 @@ void setup() {
 
   //audio_init();
 
+
+  // File system init
+  LittleFS.begin();
+  fle = LittleFS.open("/save.dat", "a");
+  if(fle.size() < 15000){
+    tft.drawString(F("Init file system..."), 0, 0);
+    for(uint16_t i=0; i<15001; i++) fle.write(0);
+  }
+  fle.close();
+
+  tft.drawString(F("Loading saves..."), 0, 0);
+  fle = LittleFS.open("/save.dat", "r+");
+  for(uint16_t i=0; i<15000; i++) 
+    cartSave[i]=fle.read();
+  fle.close();
+
   sigmaDeltaSetup(0, F_CPU / 256);
   sigmaDeltaAttachPin(SOUNDPIN);
   sigmaDeltaEnable();
@@ -385,9 +429,21 @@ void loop() {
    //fps = 1000/(millis() - tme);
    //tft.drawString(fps, 0, 120);
  
-  if (cartSaveFlag == 1 && millis() - timeEEPROMcommete > WRITE_DELAY){
-    Serial.println("Commiting!");
+  if (cartSaveFlag == 1 && millis() - timeToSave > WRITE_DELAY){
+    Serial.println("Saving");
+    if(saveMarker){
+      tft.drawString("S", 0, 0);
+      paletteAndOffsetChangeFlag=1;}
+      
+    previousSoundFlag = soundFlag;
+    soundFlag=0;
+    
+    fle = LittleFS.open("/save.dat", "r+");
+      for(uint16_t i=0; i<15000; i++) 
+      fle.write(cartSave[i]);
+    fle.close();
+
+    soundFlag = previousSoundFlag;
     cartSaveFlag = 0;
-    EEPROM.commit();
   }
 }
