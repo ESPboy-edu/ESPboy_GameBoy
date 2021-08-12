@@ -37,8 +37,8 @@ MIT license
 #define SAVE_MARKER_OFFSET 6
 
 //#include "GAMES/rom_1.h"  //test rom
-#include "GAMES/rom_2.h"  //super mario land
-//#include "GAMES/rom_3.h"  //tetris
+//#include "GAMES/rom_2.h"  //super mario land
+#include "GAMES/rom_3.h"  //tetris
 //#include "GAMES/rom_4.h"  //lemmings
 //#include "GAMES/rom_5.h"  //kirby's dream land
 //#include "GAMES/rom_6.h"  //mega man
@@ -64,6 +64,17 @@ MIT license
 //#include "GAMES/rom_28.h" //Pokemon blue
 //#include "GAMES/rom_29.h" //Q-bert
 //#include "GAMES/rom_30.h" //PacMan
+//#include "GAMES/rom_31.h" //Adventure Island
+//#include "GAMES/rom_32.h" //Adventure Island II
+//#include "GAMES/rom_33.h" //Castlevania II - Belmont's Revenge
+//#include "GAMES/rom_34.h" //Chase H.Q. 
+//#include "GAMES/rom_35.h" //Speedy Gonzales 
+//#include "GAMES/rom_36.h" //Star Wars - The Empire Strikes Back 
+//#include "GAMES/rom_37.h" //Super Mario Land 2 - 6 Golden Coins
+//#include "GAMES/rom_38.h" //Super Off Road 
+
+
+
 
 
 #define GB_ROM rom

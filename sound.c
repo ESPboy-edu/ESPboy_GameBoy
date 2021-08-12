@@ -1,4 +1,7 @@
 /* Audio Support */
+
+#pragma GCC optimize ("-O3")
+
 #include "sound.h"
 
 #include <stdio.h>
