@@ -17,34 +17,48 @@ MIT license
 #include "Arduino.h"
 #include <ESP_EEPROM.h>
 #include <Adafruit_MCP23017.h>
-#include <Adafruit_MCP4725.h>
+//#include <Adafruit_MCP4725.h>
 #include <TFT_eSPI.h>
 #include <ESP8266WiFi.h>
 #include "ESPboyLogo.h"
 #include "sound.h"
 #include "peanut_gb.c"
 #include "LittleFS.h"
+#include "nbSPI.h"
 #include <sigma_delta.h>
 
-#define WRITE_DELAY 5000
-#define CART_MEM 1
-#define SAVE_TOKEN 0xFC
-#define SAVE_TOKEN_OFFSET 1
-#define SAVE_SOUND_OFFSET 2
-#define SAVE_PALETTE_OFFSET 3
-#define SAVE_X_OFFSET 4
-#define SAVE_Y_OFFSET 5
-#define SAVE_MARKER_OFFSET 6
+
+//------------------------------------sprite_1-----------------------------------------------------------sprite_2-------------------------------------------------------------background----------
+  uint32_t PROGMEM palette0[] = { 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; // PeanutGB
+  uint32_t PROGMEM palette1[] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; // OBJ0
+  uint32_t PROGMEM palette2[] = { 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000 }; // OBJ1
+  uint32_t PROGMEM palette3[] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x7EAC, 0x40C0, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }; // BG
+  uint32_t PROGMEM palette4[] = { 0x6ACE, 0x279D, 0xE46B, 0x613A, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; //nostalgia
+  uint32_t PROGMEM palette5[] = { 0x5685, 0x8F9D, 0x6843, 0x6541, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5685, 0x8F9D, 0x6843, 0x6541, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5685, 0x8F9D, 0x6843, 0x6541 }; //greeny
+  uint32_t PROGMEM palette6[] = { 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x16F6, 0xC9D3, 0xC091, 0x8041 }; //reddy
+  uint32_t PROGMEM palette7[] = { 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x79DF, 0x2D7E, 0x6D2B, 0x6308 }; //retro lcd
+  uint32_t PROGMEM palette8[] = { 0x1F87, 0x795C, 0x7C72, 0x6959, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1F87, 0x795C, 0x7C72, 0x6959, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1F87, 0x795C, 0x7C72, 0x6959 };  //WISH GB
+  uint32_t PROGMEM palette9[] = { 0xDDF7, 0xB7C5, 0xCE52, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xDDF7, 0xB7C5, 0xCE52, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xDDF7, 0xB7C5, 0xCE52, 0x6308 };  //HOLLOW
+  uint32_t PROGMEM palette10[] ={ 0x9B9F, 0xB705, 0xF102, 0x4A01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x9B9F, 0xB705, 0xF102, 0x4A01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x9B9F, 0xB705, 0xF102, 0x4A01 };  //BLK AQU4
+  uint32_t PROGMEM palette11[] ={ 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x49CD, 0x099B, 0x0549, 0x4320 };  //GOLD GB
+  uint32_t PROGMEM palette12[] ={ 0x719F, 0x523D, 0xEE42, 0x0629, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x719F, 0x523D, 0xEE42, 0x0629, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x719F, 0x523D, 0xEE42, 0x0629 };  //NYMPH GB
+  uint32_t PROGMEM palette13[] ={ 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5685, 0x8F9D, 0x6843, 0x6541 };  //BOOTLEG BY PIXELSHIFT
+  uint32_t PROGMEM palette14[] ={ 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A };  //nostalgia+GOLD GB
+  
+  
+  const uint32_t *paletteN[] = {palette0, palette1, palette2, palette3, palette4, palette5, palette6, palette7, palette8, palette9, palette10, palette11, palette12, palette13, palette14};
+  uint32_t *paletteNN;
+  
 
 //#include "GAMES/rom_1.h"  //test rom
 //#include "GAMES/rom_2.h"  //super mario land
-#include "GAMES/rom_3.h"  //tetris
+//#include "GAMES/rom_3.h"  //tetris
 //#include "GAMES/rom_4.h"  //lemmings
 //#include "GAMES/rom_5.h"  //kirby's dream land
 //#include "GAMES/rom_6.h"  //mega man
 //#include "GAMES/rom_7.h"  //zelda
 //#include "GAMES/rom_8.h"  //prince of persia
-//#include "GAMES/rom_9.h"  //contra
+#include "GAMES/rom_9.h"  //contra
 //#include "GAMES/rom_10.h" //Felix the cat
 //#include "GAMES/rom_11.h" //Pokemon
 //#include "GAMES/rom_12.h" //Castelian
@@ -72,25 +86,34 @@ MIT license
 //#include "GAMES/rom_36.h" //Star Wars - The Empire Strikes Back 
 //#include "GAMES/rom_37.h" //Super Mario Land 2 - 6 Golden Coins
 //#include "GAMES/rom_38.h" //Super Off Road 
+//#include "GAMES/rom_50.h" //pokemon blue
 
 
-
-
-
+#define APP_MARKER 0xCCAA
+#define WRITE_DELAY 2000
+#define CART_SIZE 10000
 #define GB_ROM rom
 
 File fle;
 
-static uint8_t cartSave[15000];
+uint8_t *cartSave;
+uint8_t previousSoundFlag;
+uint8_t cartSaveFlag = 0;
+uint8_t paletteAndOffsetChangeFlag = 1;
+uint32_t timeToSave;
 
-volatile uint8_t soundFlag;
-static uint8_t previousSoundFlag;
-static uint8_t cartSaveFlag = 0;
-static uint32_t timeToSave;
-static int8_t paletteNo = 2;
-static int8_t paletteAndOffsetChangeFlag = 1;
-uint16_t offset_x=16, offset_y=8;
-uint8_t saveMarker = 1;
+
+struct SaveStruct{
+  uint32_t marker = APP_MARKER;
+  uint8_t  soundFlag = 1;
+  uint8_t  paletteNo = 2;
+  uint8_t  offset_x = 16;
+  uint8_t  offset_y = 8;
+};
+
+
+SaveStruct defaultSaveStruct, realSaveStruct;
+
 
 #define PAD_LEFT        0x01
 #define PAD_UP          0x02
@@ -109,11 +132,19 @@ uint8_t saveMarker = 1;
 #define LEDLOCK  9
 
 Adafruit_MCP23017 mcp;
-Adafruit_MCP4725 dac;
+//Adafruit_MCP4725 dac;
 TFT_eSPI tft = TFT_eSPI(); 
 
 static struct gb_s gb;
 enum gb_init_error_e ret;
+
+
+void loadFS(){
+    fle = LittleFS.open("/save.dat", "r+");
+    for(uint16_t i=0; i<CART_SIZE; i++) 
+      fle.write(cartSave[i]);
+    fle.close();
+};
 
 
 uint8_t inline getKeys() __attribute__((always_inline));
@@ -134,12 +165,12 @@ void inline __attribute__((always_inline)) IRAM_ATTR readkeys(){
     gb.direct.joypad_bits.select = (nowkeys&PAD_RGT)?0:1;}
 }
 
+
 void adjustOffset(){
   static uint8_t nowkeys;
-  previousSoundFlag = soundFlag;
-  soundFlag=0;
+  previousSoundFlag = realSaveStruct.soundFlag;
+  realSaveStruct.soundFlag=0;
   gb_run_frame(&gb);
-  tft.drawString(F("Adjusting LCD"), 24, 60);
   while(getKeys()) delay(100);
   while(1){
     tft.drawString(F("Adjusting LCD"), 24, 60);
@@ -148,19 +179,19 @@ void adjustOffset(){
     if (previousSoundFlag) tft.drawString(F("Sound ON "), 0, 0);
     else tft.drawString(F("Sound OFF"), 0, 0);
     tft.drawString(F("Palette N  "), 0, 10);
-    tft.drawString((String)paletteNo, 66, 10);
+    tft.drawString((String)realSaveStruct.paletteNo, 66, 10);
     tft.drawString(F("Save marker "), 0, 20);
-    if (saveMarker) tft.drawString(F("ON"), 72, 20);
+    if (realSaveStruct.marker) tft.drawString(F("ON"), 72, 20);
     else tft.drawString(F("OFF"), 72, 20);
     delay(150);
     while(!(nowkeys = getKeys())) delay(50);
-    if (nowkeys&PAD_UP && offset_y>0) offset_y--;
-    if (nowkeys&PAD_DOWN && offset_y<16) offset_y++;
-    if (nowkeys&PAD_LEFT && offset_x>0) offset_x--;
-    if (nowkeys&PAD_RIGHT && offset_x<32) offset_x++;
+    if (nowkeys&PAD_UP && realSaveStruct.offset_y>0) realSaveStruct.offset_y--;
+    if (nowkeys&PAD_DOWN && realSaveStruct.offset_y<16) realSaveStruct.offset_y++;
+    if (nowkeys&PAD_LEFT && realSaveStruct.offset_x>0) realSaveStruct.offset_x--;
+    if (nowkeys&PAD_RIGHT && realSaveStruct.offset_x<32) realSaveStruct.offset_x++;
     if (nowkeys&PAD_ACT) previousSoundFlag = !previousSoundFlag;
-    if (nowkeys&PAD_RGT) {paletteNo++; if(paletteNo>2)paletteNo=0;}
-    if (nowkeys&PAD_LFT) {saveMarker = !saveMarker;}
+    if (nowkeys&PAD_RGT) {realSaveStruct.paletteNo++; if(realSaveStruct.paletteNo==sizeof(paletteN)/sizeof(uint32_t *)) realSaveStruct.paletteNo=0;}
+    if (nowkeys&PAD_LFT) {realSaveStruct.marker = !realSaveStruct.marker;}
     if (nowkeys&PAD_ESC) {break;}
 
     paletteAndOffsetChangeFlag = 1;
@@ -169,7 +200,7 @@ void adjustOffset(){
   }
 
   paletteAndOffsetChangeFlag = 1;
-  soundFlag = previousSoundFlag;
+  realSaveStruct.soundFlag = previousSoundFlag;
   saveparameters();
 };
 
@@ -180,22 +211,19 @@ uint8_t inline __attribute__((always_inline)) IRAM_ATTR gb_rom_read(struct gb_s 
 
 
 uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
-
-//  Serial.print("Read "); 
-//  Serial.println(addr-cartMemOffset1); 
-  if(saveMarker){
+  if(realSaveStruct.marker){
     tft.drawString("R", 0, 0);
     paletteAndOffsetChangeFlag=1;}
 
-  if (addr<15000){
-    //Serial.print("RE "); Serial.println(addr);
+  if (addr<CART_SIZE){
     return cartSave[addr];}
   else {
-    if(saveMarker){
-      tft.drawString("ERROR!", 0, 0);
+    if(realSaveStruct.marker){
+      tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
       paletteAndOffsetChangeFlag=1;
+      delay(1000);
     }  
-    Serial.print("Read fail addr: "); Serial.println(addr);
+    //Serial.print("Read fail addr: "); Serial.println(addr);
   }
   return(0);
 }
@@ -205,23 +233,20 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
   
   cartSaveFlag = 1;
   timeToSave = millis(); 
-
- // Serial.print("Write "); 
-  //Serial.println(addr-cartMemOffset1);
-  if(saveMarker){ 
+  
+  if(realSaveStruct.marker){ 
     tft.drawString("W", 0, 0);
     paletteAndOffsetChangeFlag=1;
   }
 
-  if (addr<15000){
-    //Serial.print("WE "); Serial.println(addr);
+  if (addr<CART_SIZE){
     cartSave[addr] = val;
   }
   else {    
-    if(saveMarker){
-      tft.drawString("ERROR!", 0, 0);
+    if(realSaveStruct.marker){
+      tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
       paletteAndOffsetChangeFlag=1;}  
-    Serial.print("Save fail addr: "); Serial.println(addr);
+    //Serial.print("Save fail addr: "); Serial.println(addr);
   }
 }
 
@@ -234,33 +259,30 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 		"INVALID WRITE"
 	};
 
-	Serial.print(F("Error "));
-	Serial.print(gb_err);
-	Serial.print(F(" occurred:  "));
-	Serial.println(gb_err >= GB_INVALID_MAX ?gb_err_str[0] : gb_err_str[gb_err]);
-	Serial.print(F("At Address "));
-	Serial.println(val,HEX);
+	//Serial.print(F("Error "));
+	//Serial.print(gb_err);
+	//Serial.print(F(" occurred:  "));
+	//Serial.println(gb_err >= GB_INVALID_MAX ?gb_err_str[0] : gb_err_str[gb_err]);
+	//Serial.print(F("At Address "));
+	//Serial.println(val,HEX);
 }
 
 
+  uint_fast8_t offset_xx;
+  uint_fast8_t offset_yy;
+  uint_fast8_t offset_yyy;
+  uint16_t uiBuff1[128] __attribute__((aligned(32)));
+  uint16_t uiBuff2[128] __attribute__((aligned(32)));
+  uint16_t *currentBuf;
+  uint8_t prevLine=0;
+  bool flipBuf;
+  
 
 void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
-  static uint32_t x;
-  static uint32_t pixels_x;
-  static uint32_t offset_xx;
-  static uint32_t offset_yy;
-  static uint32_t offset_yyy = offset_yy+128;
-  static uint16_t uiBuff[128] __attribute__((aligned(32)));
-  const static uint32_t palette0[4] = { 0x7FFF, 0x329F, 0x001F, 0x0000 }; // OBJ0
-  const static uint32_t palette1[4] = { 0x7FFF, 0x3FE6, 0x0200, 0x0000 }; // OBJ1
-  const static uint32_t palette2[4] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }; // BG
-  const static uint32_t *paletteN[] = {palette0, palette1, palette2};
-  static uint32_t *paletteNN;
-
    if (paletteAndOffsetChangeFlag) {
-     paletteNN = (uint32_t *)paletteN[paletteNo];
-     offset_xx = offset_x;
-     offset_yy = offset_y;
+     paletteNN = (uint32_t *)paletteN[realSaveStruct.paletteNo];
+     offset_xx = realSaveStruct.offset_x;
+     offset_yy = realSaveStruct.offset_y;
      offset_yyy = offset_yy+128;
      tft.setAddrWindow(0, line-offset_yy, 128, 128);
      if (line == 0){
@@ -268,71 +290,69 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
        tft.setAddrWindow(0, 0, 128, 128);
      }
    }
-  
+
+  uint_fast8_t pixels_x;
   if(line >= offset_yy && line < offset_yyy){
+    if(line != prevLine+1)
+      tft.setAddrWindow(0, line-offset_yy, 128, 128);
+    if(flipBuf) currentBuf = uiBuff1;
+    else currentBuf = uiBuff2;
     pixels_x = offset_xx;
-    for (x = 0; x < 128; x++)
-      uiBuff[x] = paletteNN[pixels[pixels_x++]&3];
-    tft.pushPixels(uiBuff, 128);  
+    for (auto x = 0; x < 128; x++)
+      currentBuf[x] = pgm_read_dword (&paletteNN[pixels[pixels_x++]]);
+    while(nbSPI_isBusy());
+    nbSPI_writeBytes((uint8_t*)currentBuf, 256);  
+
+    prevLine=line;
    }
+
+   flipBuf = !flipBuf;
 }
 
 
 volatile uint8_t sound_dac;
 
 void IRAM_ATTR sound_ISR(){
-
-  if(soundFlag){
+  if(realSaveStruct.soundFlag){
     sigmaDeltaWrite(0, sound_dac);
     sound_dac = audio_update();}
-/*
-  static float sound_output[2];
-  audio_callback(NULL,(uint8_t*)&sound_output,sizeof(sound_output));
-  sound_dac = (uint8_t)(((sound_output[0]+1.0f)+(sound_output[1]+1.0f))*63.0f);*/
 }
 
 
-void loadparameters(){
-  if(EEPROM.read(CART_MEM + SAVE_TOKEN_OFFSET) != SAVE_TOKEN)
-    saveparameters();
-  else{
-    soundFlag = EEPROM.read(CART_MEM + SAVE_SOUND_OFFSET);
-    paletteNo = EEPROM.read(CART_MEM + SAVE_PALETTE_OFFSET);
-    offset_x = EEPROM.read(CART_MEM + SAVE_X_OFFSET);
-    offset_y = EEPROM.read(CART_MEM + SAVE_Y_OFFSET);
-    saveMarker = EEPROM.read(CART_MEM + SAVE_MARKER_OFFSET);
-   }  
-}
+bool loadparameters(){
+  EEPROM.get(0, realSaveStruct);
+  if(realSaveStruct.marker != APP_MARKER){
+    EEPROM.put(0, defaultSaveStruct);
+    EEPROM.commit();
+    realSaveStruct = defaultSaveStruct;
+    return(1);
+  }
+  return(0);
+};
 
 
 void saveparameters(){
-  EEPROM.write(CART_MEM + SAVE_TOKEN_OFFSET, SAVE_TOKEN);
-  EEPROM.write(CART_MEM + SAVE_SOUND_OFFSET, soundFlag);
-  previousSoundFlag = soundFlag;
-  EEPROM.write(CART_MEM + SAVE_PALETTE_OFFSET, paletteNo);
-  EEPROM.write(CART_MEM + SAVE_X_OFFSET, offset_x);
-  EEPROM.write(CART_MEM + SAVE_Y_OFFSET, offset_y);
-  EEPROM.write(CART_MEM + SAVE_MARKER_OFFSET, saveMarker);
+  realSaveStruct.soundFlag = previousSoundFlag;
+  EEPROM.put(0, realSaveStruct);
   EEPROM.commit();
-}
+};
 
 
 void setup() {
-  system_update_cpu_freq(SYS_CPU_160MHZ);
+  //system_update_cpu_freq(SYS_CPU_160MHZ);
     
-  Serial.begin(115200);
-  delay(100);
+  //Serial.begin(115200);
   
-  Serial.println();
-  Serial.println(ESP.getFreeHeap());
+  //Serial.println();
+  //Serial.println(ESP.getFreeHeap());
   
 //EEPROM init (for game cart RAM)  
-  EEPROM.begin(CART_MEM+6);
+  EEPROM.begin(sizeof(SaveStruct));
   
 //DAC init 
-  dac.begin(0x60);
-  delay (100);
-  dac.setVoltage(0, false);
+  //dac.begin(0x60);
+  //delay (100);
+  //dac.setVoltage(0, false);
 
 //MCP23017 GPIO extantion init
   mcp.begin(MCP23017address);
@@ -349,17 +369,13 @@ void setup() {
 
 // Sound init and test
   pinMode(SOUNDPIN, OUTPUT);
-  /*tone(SOUNDPIN, 200, 100);
-  delay(100);
-  tone(SOUNDPIN, 100, 100);
-  delay(100);
-  noTone(SOUNDPIN);*/
 
 // TFT init
   mcp.pinMode(CSTFTPIN, OUTPUT);
   mcp.digitalWrite(CSTFTPIN, LOW);
   tft.begin();
   delay(100);
+  tft.startWrite(); 
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
 
@@ -367,11 +383,12 @@ void setup() {
   tft.drawXBitmap(30, 20, ESPboyLogo, 68, 64, TFT_YELLOW);
   tft.setTextColor(TFT_YELLOW, TFT_BLACK);
   tft.drawString(F("GameBoy emulator"), 20, 95);
-  for (uint8_t i = 0; i<100; i++){
-    dac.setVoltage(i* 10, false);
-    delay(7);}
-  dac.setVoltage(4095, true);
-  delay(1000);
+  delay(1500);
+  //for (uint8_t i = 0; i<100; i++){
+  //  dac.setVoltage(i* 10, false);
+  //  delay(7);}
+  //dac.setVoltage(4095, true);
+  //delay(1000);
 
 // clear screen
   tft.fillScreen(TFT_BLACK);
@@ -379,37 +396,34 @@ void setup() {
   WiFi.mode(WIFI_OFF);
 
 
-// init game boy evulator
+// init game boy emulator
    ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
 
-	if(ret != GB_INIT_NO_ERROR){
-		Serial.print("Error: ");
-		Serial.println(ret);}
+	//if(ret != GB_INIT_NO_ERROR){
+		//Serial.print("Error: ");
+		//Serial.println(ret);}
 
 	  gb_init_lcd(&gb, &lcd_draw_line);
     gb.direct.interlace = 0;
     gb.direct.frame_skip = 1;
 
-  //setup sound
-
-  //audio_init();
-
 
   // File system init
+  cartSave = (uint8_t *)malloc (CART_SIZE+1);  
   LittleFS.begin();
-  fle = LittleFS.open("/save.dat", "a");
-  if(fle.size() < 15000){
+  if (loadparameters()){
+    tft.drawString(F("Formatting FS..."), 0, 0);
+    LittleFS.format();
+    tft.fillScreen(TFT_BLACK);
     tft.drawString(F("Init file system..."), 0, 0);
-    for(uint16_t i=0; i<15001; i++) fle.write(0);
+    fle = LittleFS.open("/save.dat", "a");
+    for(uint16_t i=0; i<CART_SIZE; i++) fle.write(0);
+    fle.close();
+    tft.fillScreen(TFT_BLACK);
   }
-  fle.close();
 
-  tft.drawString(F("Loading saves..."), 0, 0);
-  fle = LittleFS.open("/save.dat", "r+");
-  for(uint16_t i=0; i<15000; i++) 
-    cartSave[i]=fle.read();
-  fle.close();
-
+  loadFS();
+  
   sigmaDeltaSetup(0, F_CPU / 256);
   sigmaDeltaAttachPin(SOUNDPIN);
   sigmaDeltaEnable();
@@ -420,41 +434,42 @@ void setup() {
   timer1_isr_init();
   timer1_attachInterrupt(sound_ISR);
   timer1_enable(TIM_DIV1, TIM_EDGE, TIM_LOOP);
-  timer1_write(ESP.getCpuFreqMHz() * 1000000 / SAMPLING_RATE);//AUDIO_SAMPLE_RATE);
+  timer1_write(80 * 1000000 / SAMPLING_RATE);//AUDIO_SAMPLE_RATE);
   interrupts();
   
-  Serial.println(ESP.getFreeHeap());
+  //Serial.println(ESP.getFreeHeap());
 
   tft.setAddrWindow(0, 0, 128, 128);
-  loadparameters();
 }
 
 
-void loop() {
-   //static String fps;
-   //uint32_t tme = millis();
- 
+
+#define FRAME_TIME 15000
+uint32_t nextScreen;
+bool everysecondgetkey;
+
+void loop() { 
+   nextScreen = micros() + FRAME_TIME ;
+
+   if(everysecondgetkey) readkeys();
+   everysecondgetkey = !everysecondgetkey;
+   
    gb_run_frame(&gb);
-   readkeys();
- 
-   //fps = 1000/(millis() - tme);
-   //tft.drawString(fps, 0, 120);
  
   if (cartSaveFlag == 1 && millis() - timeToSave > WRITE_DELAY){
-    Serial.println("Saving");
-    if(saveMarker){
+    //Serial.println("Saving");
+    if(realSaveStruct.marker){
       tft.drawString("S", 0, 0);
       paletteAndOffsetChangeFlag=1;}
       
-    previousSoundFlag = soundFlag;
-    soundFlag=0;
-    
-    fle = LittleFS.open("/save.dat", "r+");
-      for(uint16_t i=0; i<15000; i++) 
-      fle.write(cartSave[i]);
-    fle.close();
+    previousSoundFlag = realSaveStruct.soundFlag;
+    realSaveStruct.soundFlag=0;
 
-    soundFlag = previousSoundFlag;
+    loadFS();
+
+    realSaveStruct.soundFlag = previousSoundFlag;
     cartSaveFlag = 0;
   }
-}
+
+  while(nextScreen > micros());
+};
