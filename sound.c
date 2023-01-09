@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <math.h>
 
-extern uint8_t soundFlag;
 
 // Audio output buffer
 
@@ -513,7 +512,7 @@ u8 audio_update()
     s16 out=0;
 
     // check APU power
-    if (SO.power && soundFlag) 
+    if (SO.power) 
         {
     /*
         Channel logic and sound generation.
@@ -574,10 +573,10 @@ u8 audio_update()
 
     CHANNEL_UPDATE(
         &CH3.channel, 3,
-        256 - CH3.sound_len,
+        64 - CH3.sound_len,
         audio_cycle);
 
-    if (CH3.channel.enable && CH3.enable)
+    if (CH3.channel.enable && 1)
         {
         out+=GENERATE_CH3(CH3.channel.freq, CH3.out_level);
         }
@@ -598,7 +597,7 @@ u8 audio_update()
             audio_cycle
         );
 //out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS));
-    out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS))>>2;//make noise silent dev by 4
+    out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS))>>3;//make noise silent dev by 8
         }
     
         }
