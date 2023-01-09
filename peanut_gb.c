@@ -80,7 +80,7 @@
 /**
  * Sound support must be provided by an external library. When audio_read() and
  * audio_write() functions are provided, define ENABLE_SOUND to a non-zero value
- * before including peanut_gb.h in order for these functions to be used.
+ * before including peanut_gb->h in order for these functions to be used.
  */
 #ifndef ENABLE_SOUND
 # define ENABLE_SOUND 1
@@ -448,7 +448,7 @@ struct count_s
 	#define LCD_COLOUR	0x03
 	/**
 	* Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
-	* palette when playing a DMG game on CGB.
+	* palette when playing a DMG game on Cgb->
 	*/
 	#define LCD_PALETTE_OBJ	0x10
 	#define LCD_PALETTE_BG	0x20
@@ -3729,7 +3729,7 @@ void gb_set_rtc(struct gb_s *gb, const struct tm * const time)
  *
  * \param gb	Allocated emulator context. Must not be NULL.
  * \param gb_rom_read Pointer to function that reads ROM data. ROM banking is
- * 		already handled by Peanut-GB. Must not be NULL.
+ * 		already handled by Peanut-gb-> Must not be NULL.
  * \param gb_cart_ram_read Pointer to function that reads Cart RAM. Must not be
  * 		NULL.
  * \param gb_cart_ram_write Pointer to function to writes to Cart RAM. Must not

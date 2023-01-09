@@ -15,17 +15,24 @@ MIT license
 #pragma GCC push_options
 
 #include "Arduino.h"
+
+#include "lib/ESPboyInit.h"
+#include "lib/ESPboyInit.cpp"
+//#include "lib/ESPboyTerminalGUI.h"
+//#include "lib/ESPboyTerminalGUI.cpp"
+//#include "lib/ESPboyOTA2.h"
+//#include "lib/ESPboyOTA2.cpp"
+
 #include <ESP_EEPROM.h>
-#include <Adafruit_MCP23017.h>
-//#include <Adafruit_MCP4725.h>
-#include <TFT_eSPI.h>
-#include <ESP8266WiFi.h>
-#include "ESPboyLogo.h"
 #include "sound.h"
 #include "peanut_gb.c"
 #include "LittleFS.h"
 #include "nbSPI.h"
 #include <sigma_delta.h>
+
+ESPboyInit myESPboy;
+//ESPboyTerminalGUI *terminalGUIobj = NULL;
+//ESPboyOTA2 *OTA2obj = NULL;
 
 
 //------------------------------------sprite_1-----------------------------------------------------------sprite_2-------------------------------------------------------------background----------
@@ -58,7 +65,7 @@ MIT license
 //#include "GAMES/rom_6.h"  //mega man
 //#include "GAMES/rom_7.h"  //zelda
 //#include "GAMES/rom_8.h"  //prince of persia
-#include "GAMES/rom_9.h"  //contra
+//#include "GAMES/rom_9.h"  //contra
 //#include "GAMES/rom_10.h" //Felix the cat
 //#include "GAMES/rom_11.h" //Pokemon
 //#include "GAMES/rom_12.h" //Castelian
@@ -86,6 +93,9 @@ MIT license
 //#include "GAMES/rom_36.h" //Star Wars - The Empire Strikes Back 
 //#include "GAMES/rom_37.h" //Super Mario Land 2 - 6 Golden Coins
 //#include "GAMES/rom_38.h" //Super Off Road 
+//#include "GAMES/rom_39.h" //Pocket_Monsters_-_Green_Version_J_V1.0_S_patched
+//#include "GAMES/rom_40.h" //bomberman
+//#include "GAMES/rom_41.h" //super chase hq
 //#include "GAMES/rom_50.h" //pokemon blue
 
 
@@ -98,15 +108,15 @@ File fle;
 
 uint8_t *cartSave;
 uint8_t previousSoundFlag;
-uint8_t cartSaveFlag = 0;
 uint8_t paletteAndOffsetChangeFlag = 1;
 uint32_t timeToSave;
 
 
 struct SaveStruct{
   uint32_t marker = APP_MARKER;
-  uint8_t  soundFlag = 1;
-  uint8_t  paletteNo = 2;
+  bool  soundFlag = 1;
+  bool  cartSaveFlag = 0;
+  uint8_t  paletteNo = 6;
   uint8_t  offset_x = 16;
   uint8_t  offset_y = 8;
 };
@@ -114,30 +124,8 @@ struct SaveStruct{
 
 SaveStruct defaultSaveStruct, realSaveStruct;
 
-
-#define PAD_LEFT        0x01
-#define PAD_UP          0x02
-#define PAD_DOWN        0x04
-#define PAD_RIGHT       0x08
-#define PAD_ACT         0x10
-#define PAD_ESC         0x20
-#define PAD_LFT         0x40
-#define PAD_RGT         0x80
-#define PAD_ANY         0xff
-
-#define MCP23017address 0  
-#define LEDPIN D4
-#define SOUNDPIN D3
-#define CSTFTPIN 8  
-#define LEDLOCK  9
-
-Adafruit_MCP23017 mcp;
-//Adafruit_MCP4725 dac;
-TFT_eSPI tft = TFT_eSPI(); 
-
-static struct gb_s gb;
+struct gb_s *gb;
 enum gb_init_error_e ret;
-
 
 void loadFS(){
     fle = LittleFS.open("/save.dat", "r+");
@@ -147,22 +135,19 @@ void loadFS(){
 };
 
 
-uint8_t inline getKeys() __attribute__((always_inline));
-uint8_t inline getKeys() { return (~mcp.readGPIOAB() & 255); }
-
 void inline __attribute__((always_inline)) IRAM_ATTR readkeys(){
  static uint8_t nowkeys;
-  nowkeys = getKeys();
-  if (nowkeys&PAD_LFT && nowkeys&PAD_RGT && cartSaveFlag == 0) adjustOffset();
+  nowkeys = myESPboy.getKeys();
+  if (nowkeys&PAD_LFT && nowkeys&PAD_RGT && realSaveStruct.cartSaveFlag == 0) adjustOffset();
   else{
-    gb.direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
-    gb.direct.joypad_bits.b = (nowkeys&PAD_ESC)?0:1;
-    gb.direct.joypad_bits.up = (nowkeys&PAD_UP)?0:1;
-    gb.direct.joypad_bits.down = (nowkeys&PAD_DOWN)?0:1;
-    gb.direct.joypad_bits.left = (nowkeys&PAD_LEFT)?0:1;
-    gb.direct.joypad_bits.right = (nowkeys&PAD_RIGHT)?0:1;
-    gb.direct.joypad_bits.start = (nowkeys&PAD_LFT)?0:1;
-    gb.direct.joypad_bits.select = (nowkeys&PAD_RGT)?0:1;}
+    gb->direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
+    gb->direct.joypad_bits.b = (nowkeys&PAD_ESC)?0:1;
+    gb->direct.joypad_bits.up = (nowkeys&PAD_UP)?0:1;
+    gb->direct.joypad_bits.down = (nowkeys&PAD_DOWN)?0:1;
+    gb->direct.joypad_bits.left = (nowkeys&PAD_LEFT)?0:1;
+    gb->direct.joypad_bits.right = (nowkeys&PAD_RIGHT)?0:1;
+    gb->direct.joypad_bits.start = (nowkeys&PAD_LFT)?0:1;
+    gb->direct.joypad_bits.select = (nowkeys&PAD_RGT)?0:1;}
 }
 
 
@@ -170,21 +155,21 @@ void adjustOffset(){
   static uint8_t nowkeys;
   previousSoundFlag = realSaveStruct.soundFlag;
   realSaveStruct.soundFlag=0;
-  gb_run_frame(&gb);
-  while(getKeys()) delay(100);
+  gb_run_frame(gb);
+  while(myESPboy.getKeys()) delay(100);
   while(1){
-    tft.drawString(F("Adjusting LCD"), 24, 60);
-    tft.drawString(F("up/down/left/right"), 8, 70);
+    myESPboy.tft.drawString(F("Adjusting LCD"), 24, 60);
+    myESPboy.tft.drawString(F("up/down/left/right"), 8, 70);
     
-    if (previousSoundFlag) tft.drawString(F("Sound ON "), 0, 0);
-    else tft.drawString(F("Sound OFF"), 0, 0);
-    tft.drawString(F("Palette N  "), 0, 10);
-    tft.drawString((String)realSaveStruct.paletteNo, 66, 10);
-    tft.drawString(F("Save marker "), 0, 20);
-    if (realSaveStruct.marker) tft.drawString(F("ON"), 72, 20);
-    else tft.drawString(F("OFF"), 72, 20);
+    if (previousSoundFlag) myESPboy.tft.drawString(F("Sound ON "), 0, 0);
+    else myESPboy.tft.drawString(F("Sound OFF"), 0, 0);
+    myESPboy.tft.drawString(F("Palette N  "), 0, 10);
+    myESPboy.tft.drawString((String)realSaveStruct.paletteNo, 66, 10);
+    myESPboy.tft.drawString(F("Save marker "), 0, 20);
+    if (realSaveStruct.marker) myESPboy.tft.drawString(F("ON"), 72, 20);
+    else myESPboy.tft.drawString(F("OFF"), 72, 20);
     delay(150);
-    while(!(nowkeys = getKeys())) delay(50);
+    while(!(nowkeys = myESPboy.getKeys())) delay(50);
     if (nowkeys&PAD_UP && realSaveStruct.offset_y>0) realSaveStruct.offset_y--;
     if (nowkeys&PAD_DOWN && realSaveStruct.offset_y<16) realSaveStruct.offset_y++;
     if (nowkeys&PAD_LEFT && realSaveStruct.offset_x>0) realSaveStruct.offset_x--;
@@ -195,8 +180,8 @@ void adjustOffset(){
     if (nowkeys&PAD_ESC) {break;}
 
     paletteAndOffsetChangeFlag = 1;
-    gb_run_frame(&gb);
-    gb_run_frame(&gb);
+    gb_run_frame(gb);
+    gb_run_frame(gb);
   }
 
   paletteAndOffsetChangeFlag = 1;
@@ -212,14 +197,14 @@ uint8_t inline __attribute__((always_inline)) IRAM_ATTR gb_rom_read(struct gb_s 
 
 uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
   if(realSaveStruct.marker){
-    tft.drawString("R", 0, 0);
+    myESPboy.tft.drawString("R", 0, 0);
     paletteAndOffsetChangeFlag=1;}
 
   if (addr<CART_SIZE){
     return cartSave[addr];}
   else {
     if(realSaveStruct.marker){
-      tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
+      myESPboy.tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
       paletteAndOffsetChangeFlag=1;
       delay(1000);
     }  
@@ -231,11 +216,11 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
 
 void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
   
-  cartSaveFlag = 1;
+  realSaveStruct.cartSaveFlag = 1;
   timeToSave = millis(); 
   
   if(realSaveStruct.marker){ 
-    tft.drawString("W", 0, 0);
+    myESPboy.tft.drawString("W", 0, 0);
     paletteAndOffsetChangeFlag=1;
   }
 
@@ -244,7 +229,7 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
   }
   else {    
     if(realSaveStruct.marker){
-      tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
+      myESPboy.tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
       paletteAndOffsetChangeFlag=1;}  
     //Serial.print("Save fail addr: "); Serial.println(addr);
   }
@@ -284,17 +269,17 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
      offset_xx = realSaveStruct.offset_x;
      offset_yy = realSaveStruct.offset_y;
      offset_yyy = offset_yy+128;
-     tft.setAddrWindow(0, line-offset_yy, 128, 128);
+     myESPboy.tft.setAddrWindow(0, line-offset_yy, 128, 128);
      if (line == 0){
        paletteAndOffsetChangeFlag=0;
-       tft.setAddrWindow(0, 0, 128, 128);
+       myESPboy.tft.setAddrWindow(0, 0, 128, 128);
      }
    }
 
   uint_fast8_t pixels_x;
   if(line >= offset_yy && line < offset_yyy){
     if(line != prevLine+1)
-      tft.setAddrWindow(0, line-offset_yy, 128, 128);
+      myESPboy.tft.setAddrWindow(0, line-offset_yy, 128, 128);
     if(flipBuf) currentBuf = uiBuff1;
     else currentBuf = uiBuff2;
     pixels_x = offset_xx;
@@ -348,80 +333,51 @@ void setup() {
   //Serial.println();
   //Serial.println(ESP.getFreeHeap());
   
-//EEPROM init (for game cart RAM)  
-  EEPROM.begin(sizeof(SaveStruct));
-  
-//DAC init 
-  //dac.begin(0x60);
-  //delay (100);
-  //dac.setVoltage(0, false);
 
-//MCP23017 GPIO extantion init
-  mcp.begin(MCP23017address);
-  delay(100);
+  myESPboy.begin("GameBoy emu 2.0");
 
-  for (int i = 0; i < 8; ++i) {
-    mcp.pinMode(i, INPUT);
-    mcp.pullUp(i, HIGH);
-  }
+//Check OTA2
+//  if (myESPboy.getKeys()&PAD_ACT || myESPboy.getKeys()&PAD_ESC) { 
+//     terminalGUIobj = new ESPboyTerminalGUI(&myESPboy.tft, &myESPboy.mcp);
+//     OTA2obj = new ESPboyOTA2(terminalGUIobj);
+//  }
 
-//LED init
-  //mcp.pinMode(LEDLOCK, OUTPUT);
-  //mcp.digitalWrite(LEDLOCK, HIGH); 
-
-// Sound init and test
-  pinMode(SOUNDPIN, OUTPUT);
-
-// TFT init
-  mcp.pinMode(CSTFTPIN, OUTPUT);
-  mcp.digitalWrite(CSTFTPIN, LOW);
-  tft.begin();
-  delay(100);
-  tft.startWrite(); 
-  tft.setRotation(0);
-  tft.fillScreen(TFT_BLACK);
-
-// draw ESPboylogo
-  tft.drawXBitmap(30, 20, ESPboyLogo, 68, 64, TFT_YELLOW);
-  tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-  tft.drawString(F("GameBoy emulator"), 20, 95);
-  delay(1500);
-  //for (uint8_t i = 0; i<100; i++){
-  //  dac.setVoltage(i* 10, false);
-  //  delay(7);}
-  //dac.setVoltage(4095, true);
-  //delay(1000);
-
-// clear screen
-  tft.fillScreen(TFT_BLACK);
 
   WiFi.mode(WIFI_OFF);
+  myESPboy.tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+  myESPboy.tft.fillScreen(TFT_BLACK);
 
+//EEPROM init (for game cart RAM)  
+  EEPROM.begin(sizeof(SaveStruct));
 
 // init game boy emulator
-   ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
+   gb = new gb_s;
+
+   ret = gb_init(gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
 
 	//if(ret != GB_INIT_NO_ERROR){
 		//Serial.print("Error: ");
 		//Serial.println(ret);}
 
-	  gb_init_lcd(&gb, &lcd_draw_line);
-    gb.direct.interlace = 0;
-    gb.direct.frame_skip = 1;
+	  gb_init_lcd(gb, &lcd_draw_line);
+    gb->direct.interlace = 0;
+    gb->direct.frame_skip = 1;
 
 
   // File system init
   cartSave = (uint8_t *)malloc (CART_SIZE+1);  
   LittleFS.begin();
   if (loadparameters()){
-    tft.drawString(F("Formatting FS..."), 0, 0);
+    myESPboy.tft.drawString(F("Init file system..."), 0, 0);
     LittleFS.format();
-    tft.fillScreen(TFT_BLACK);
-    tft.drawString(F("Init file system..."), 0, 0);
     fle = LittleFS.open("/save.dat", "a");
     for(uint16_t i=0; i<CART_SIZE; i++) fle.write(0);
     fle.close();
-    tft.fillScreen(TFT_BLACK);
+    myESPboy.tft.fillScreen(TFT_BLACK);
+    myESPboy.tft.drawString(F("<< press both side >>"), 0, 15);
+    myESPboy.tft.drawString(F("buttons for settings"), 3, 30);
+    delay(3000);
+    myESPboy.tft.fillScreen(TFT_BLACK);
   }
 
   loadFS();
@@ -441,7 +397,8 @@ void setup() {
   
   //Serial.println(ESP.getFreeHeap());
 
-  tft.setAddrWindow(0, 0, 128, 128);
+  myESPboy.tft.setAddrWindow(0, 0, 128, 128);
+  myESPboy.tft.startWrite(); 
 }
 
 
@@ -457,12 +414,12 @@ void loop() {
 
    nextScreen = micros() + FRAME_TIME ;
    
-   gb_run_frame(&gb);
+   gb_run_frame(gb);
  
-  if (cartSaveFlag == 1 && millis() - timeToSave > WRITE_DELAY){
+  if (realSaveStruct.cartSaveFlag == 1 && millis() - timeToSave > WRITE_DELAY){
     //Serial.println("Saving");
     if(realSaveStruct.marker){
-      tft.drawString("S", 0, 0);
+      myESPboy.tft.drawString("S", 0, 0);
       paletteAndOffsetChangeFlag=1;}
       
     previousSoundFlag = realSaveStruct.soundFlag;
@@ -471,7 +428,7 @@ void loop() {
     loadFS();
 
     realSaveStruct.soundFlag = previousSoundFlag;
-    cartSaveFlag = 0;
+    realSaveStruct.cartSaveFlag = 0;
   }
 
   while(nextScreen > micros());
