@@ -29,29 +29,29 @@ MIT license
 
 
 //------------------------------------sprite_1-----------------------------------------------------------sprite_2-------------------------------------------------------------background----------
-  uint32_t PROGMEM palette0[] = { 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; // PeanutGB
-  uint32_t PROGMEM palette1[] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; // OBJ0
-  uint32_t PROGMEM palette2[] = { 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000 }; // OBJ1
-  uint32_t PROGMEM palette3[] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x7EAC, 0x40C0, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }; // BG
-  uint32_t PROGMEM palette4[] = { 0x6ACE, 0x279D, 0xE46B, 0x613A, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; //nostalgia
-  uint32_t PROGMEM palette5[] = { 0x5685, 0x8F9D, 0x6843, 0x6541, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5685, 0x8F9D, 0x6843, 0x6541, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5685, 0x8F9D, 0x6843, 0x6541 }; //greeny
-  uint32_t PROGMEM palette6[] = { 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x16F6, 0xC9D3, 0xC091, 0x8041 }; //reddy
-  uint32_t PROGMEM palette7[] = { 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x79DF, 0x2D7E, 0x6D2B, 0x6308 }; //retro lcd
-  uint32_t PROGMEM palette8[] = { 0x1F87, 0x795C, 0x7C72, 0x6959, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1F87, 0x795C, 0x7C72, 0x6959, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1F87, 0x795C, 0x7C72, 0x6959 };  //WISH GB
-  uint32_t PROGMEM palette9[] = { 0xDDF7, 0xB7C5, 0xCE52, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xDDF7, 0xB7C5, 0xCE52, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xDDF7, 0xB7C5, 0xCE52, 0x6308 };  //HOLLOW
-  uint32_t PROGMEM palette10[] ={ 0x9B9F, 0xB705, 0xF102, 0x4A01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x9B9F, 0xB705, 0xF102, 0x4A01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x9B9F, 0xB705, 0xF102, 0x4A01 };  //BLK AQU4
-  uint32_t PROGMEM palette11[] ={ 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x49CD, 0x099B, 0x0549, 0x4320 };  //GOLD GB
-  uint32_t PROGMEM palette12[] ={ 0x719F, 0x523D, 0xEE42, 0x0629, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x719F, 0x523D, 0xEE42, 0x0629, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x719F, 0x523D, 0xEE42, 0x0629 };  //NYMPH GB
-  uint32_t PROGMEM palette13[] ={ 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5685, 0x8F9D, 0x6843, 0x6541 };  //BOOTLEG BY PIXELSHIFT
-  uint32_t PROGMEM palette14[] ={ 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A };  //nostalgia+GOLD GB
+  const uint32_t PROGMEM palette0[] = { 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; // PeanutGB
+  const uint32_t PROGMEM palette1[] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; // OBJ0
+  const uint32_t PROGMEM palette2[] = { 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000 }; // OBJ1
+  const uint32_t PROGMEM palette3[] = { 0x7FFF, 0x7EAC, 0x40C0, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x7EAC, 0x40C0, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }; // BG
+  const uint32_t PROGMEM palette4[] = { 0x6ACE, 0x279D, 0xE46B, 0x613A, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; //nostalgia
+  const uint32_t PROGMEM palette5[] = { 0x5685, 0x8F9D, 0x6843, 0x6541, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5685, 0x8F9D, 0x6843, 0x6541, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5685, 0x8F9D, 0x6843, 0x6541 }; //greeny
+  const uint32_t PROGMEM palette6[] = { 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x16F6, 0xC9D3, 0xC091, 0x8041 }; //reddy
+  const uint32_t PROGMEM palette7[] = { 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x79DF, 0x2D7E, 0x6D2B, 0x6308 }; //retro lcd
+  const uint32_t PROGMEM palette8[] = { 0x1F87, 0x795C, 0x7C72, 0x6959, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1F87, 0x795C, 0x7C72, 0x6959, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1F87, 0x795C, 0x7C72, 0x6959 };  //WISH GB
+  const uint32_t PROGMEM palette9[] = { 0xDDF7, 0xB7C5, 0xCE52, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xDDF7, 0xB7C5, 0xCE52, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xDDF7, 0xB7C5, 0xCE52, 0x6308 };  //HOLLOW
+  const uint32_t PROGMEM palette10[] ={ 0x9B9F, 0xB705, 0xF102, 0x4A01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x9B9F, 0xB705, 0xF102, 0x4A01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x9B9F, 0xB705, 0xF102, 0x4A01 };  //BLK AQU4
+  const uint32_t PROGMEM palette11[] ={ 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x49CD, 0x099B, 0x0549, 0x4320 };  //GOLD GB
+  const uint32_t PROGMEM palette12[] ={ 0x719F, 0x523D, 0xEE42, 0x0629, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x719F, 0x523D, 0xEE42, 0x0629, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x719F, 0x523D, 0xEE42, 0x0629 };  //NYMPH GB
+  const uint32_t PROGMEM palette13[] ={ 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x16F6, 0xC9D3, 0xC091, 0x8041, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5685, 0x8F9D, 0x6843, 0x6541 };  //BOOTLEG BY PIXELSHIFT
+  const uint32_t PROGMEM palette14[] ={ 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x49CD, 0x099B, 0x0549, 0x4320, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A };  //nostalgia+GOLD GB
   
   
-  const uint32_t *paletteN[] = {palette0, palette1, palette2, palette3, palette4, palette5, palette6, palette7, palette8, palette9, palette10, palette11, palette12, palette13, palette14};
+  const PROGMEM uint32_t *paletteN[] = {palette0, palette1, palette2, palette3, palette4, palette5, palette6, palette7, palette8, palette9, palette10, palette11, palette12, palette13, palette14};
   uint32_t *paletteNN;
   
 
 //#include "GAMES/rom_1.h"  //test rom
-//#include "GAMES/rom_2.h"  //super mario land
+#include "GAMES/rom_2.h"  //super mario land
 //#include "GAMES/rom_3.h"  //tetris
 //#include "GAMES/rom_4.h"  //lemmings
 //#include "GAMES/rom_5.h"  //kirby's dream land
@@ -313,9 +313,11 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
 volatile uint8_t sound_dac;
 
 void IRAM_ATTR sound_ISR(){
-  if(realSaveStruct.soundFlag){
+  static bool sound_prev;
+  if(realSaveStruct.soundFlag && sound_prev!=sound_dac){
     sigmaDeltaWrite(0, sound_dac);
     sound_dac = audio_update();}
+  sound_prev = !sound_prev;
 }
 
 
@@ -449,10 +451,11 @@ uint32_t nextScreen;
 bool everysecondgetkey;
 
 void loop() { 
-   nextScreen = micros() + FRAME_TIME ;
 
    if(everysecondgetkey) readkeys();
    everysecondgetkey = !everysecondgetkey;
+
+   nextScreen = micros() + FRAME_TIME ;
    
    gb_run_frame(&gb);
  
