@@ -96,6 +96,7 @@ ESPboyInit myESPboy;
 //#include "GAMES/rom_39.h" //Pocket_Monsters_-_Green_Version_J_V1.0_S_patched
 //#include "GAMES/rom_40.h" //bomberman
 //#include "GAMES/rom_41.h" //super chase hq
+//#include "GAMES/rom_42.h" //Burai Fighter Deluxe
 //#include "GAMES/rom_50.h" //pokemon blue
 
 
