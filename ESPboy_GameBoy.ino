@@ -188,16 +188,15 @@ void loadFS(){
 void inline __attribute__((always_inline)) IRAM_ATTR readkeys(){
  static uint8_t nowkeys;
   nowkeys = myESPboy.getKeys();
+  gb->direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
+  gb->direct.joypad_bits.b = (nowkeys&PAD_ESC)?0:1;
+  gb->direct.joypad_bits.up = (nowkeys&PAD_UP)?0:1;
+  gb->direct.joypad_bits.down = (nowkeys&PAD_DOWN)?0:1;
+  gb->direct.joypad_bits.left = (nowkeys&PAD_LEFT)?0:1;
+  gb->direct.joypad_bits.right = (nowkeys&PAD_RIGHT)?0:1;
+  gb->direct.joypad_bits.start = (nowkeys&PAD_LFT)?0:1;
+  gb->direct.joypad_bits.select = (nowkeys&PAD_RGT)?0:1;
   if (nowkeys&PAD_LFT && nowkeys&PAD_RGT && cartSaveFlag == 0) adjustOffset();
-  else{
-    gb->direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
-    gb->direct.joypad_bits.b = (nowkeys&PAD_ESC)?0:1;
-    gb->direct.joypad_bits.up = (nowkeys&PAD_UP)?0:1;
-    gb->direct.joypad_bits.down = (nowkeys&PAD_DOWN)?0:1;
-    gb->direct.joypad_bits.left = (nowkeys&PAD_LEFT)?0:1;
-    gb->direct.joypad_bits.right = (nowkeys&PAD_RIGHT)?0:1;
-    gb->direct.joypad_bits.start = (nowkeys&PAD_LFT)?0:1;
-    gb->direct.joypad_bits.select = (nowkeys&PAD_RGT)?0:1;}
 }
 
 
@@ -205,7 +204,6 @@ void adjustOffset(){
   static uint8_t nowkeys;
   previousSoundFlag = realSaveStruct.soundFlag;
   realSaveStruct.soundFlag=0;
-  gb_run_frame(gb);
   while(myESPboy.getKeys()) delay(100);
   while(nbSPI_isBusy());
   while(1){
@@ -227,7 +225,7 @@ void adjustOffset(){
     if (nowkeys&PAD_RIGHT && realSaveStruct.offset_x<32) realSaveStruct.offset_x++;
     if (nowkeys&PAD_ACT) previousSoundFlag = !previousSoundFlag;
     if (nowkeys&PAD_RGT) {realSaveStruct.paletteNo++; if(realSaveStruct.paletteNo==sizeof(paletteN)/sizeof(uint32_t *)) realSaveStruct.paletteNo=0;}
-    if (nowkeys&PAD_LFT) {realSaveStruct.savingMarker = !realSaveStruct.savingMarker;}
+    //if (nowkeys&PAD_LFT) {realSaveStruct.savingMarker = !realSaveStruct.savingMarker;}
     if (nowkeys&PAD_ESC) {break;}
 
     paletteAndOffsetChangeFlag = 1;
