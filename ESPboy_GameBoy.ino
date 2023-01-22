@@ -58,51 +58,91 @@ ESPboyInit myESPboy;
   
 
 //#include "GAMES/rom_1.h"  //test rom
-#include "GAMES/rom_2.h"  //super mario land
+//#define APP_MARKER 0xCC01
+//#include "GAMES/rom_2.h"  //super mario land
+//#define APP_MARKER 0xCC02
 //#include "GAMES/rom_3.h"  //tetris
+//#define APP_MARKER 0xCC03
 //#include "GAMES/rom_4.h"  //lemmings
+//#define APP_MARKER 0xCC04
 //#include "GAMES/rom_5.h"  //kirby's dream land
+//#define APP_MARKER 0xCC05
 //#include "GAMES/rom_6.h"  //mega man
-//#include "GAMES/rom_7.h"  //zelda
+//#define APP_MARKER 0xCC06
+#include "GAMES/rom_7.h"  //zelda
+#define APP_MARKER 0xCC07
 //#include "GAMES/rom_8.h"  //prince of persia
+//#define APP_MARKER 0xCC08
 //#include "GAMES/rom_9.h"  //contra
+//#define APP_MARKER 0xCC09
 //#include "GAMES/rom_10.h" //Felix the cat
+//#define APP_MARKER 0xCC10
 //#include "GAMES/rom_11.h" //Pokemon
+//#define APP_MARKER 0xCC11
 //#include "GAMES/rom_12.h" //Castelian
+//#define APP_MARKER 0xCC12
 //#include "GAMES/rom_13.h" //Castelvania
+//#define APP_MARKER 0xCC13
 //#include "GAMES/rom_14.h" //Donkey Kong Land
+//#define APP_MARKER 0xCC14
 //#include "GAMES/rom_15.h" //Double dragon
+//#define APP_MARKER 0xCC15
 //#include "GAMES/rom_16.h" //R-type
+//#define APP_MARKER 0xCC16
 //#include "GAMES/rom_17.h" //Mega man III
+//#define APP_MARKER 0xCC17
 //#include "GAMES/rom_18.h" //R-type II
+//#define APP_MARKER 0xCC18
 //#include "GAMES/rom_19.h" //nemezis
+//#define APP_MARKER 0xCC19
 //#include "GAMES/rom_20.h" //ninja gaiden shadow
+//#define APP_MARKER 0xCC20
 //#include "GAMES/rom_21.h" //spy vs spy
+//#define APP_MARKER 0xCC21
 //#include "GAMES/rom_22.h" //Robocop
+//#define APP_MARKER 0xCC22
 //#include "GAMES/rom_23.h" //Solar Striker
+//#define APP_MARKER 0xCC23
 //#include "GAMES/rom_26.h" //Mortal Combat
+//#define APP_MARKER 0xCC24
 //#include "GAMES/rom_27.h" //Mortal Combat 2
+//#define APP_MARKER 0xCC25
 //#include "GAMES/rom_28.h" //Pokemon blue
+//#define APP_MARKER 0xCC26
 //#include "GAMES/rom_29.h" //Q-bert
+//#define APP_MARKER 0xCC27
 //#include "GAMES/rom_30.h" //PacMan
+//#define APP_MARKER 0xCC28
 //#include "GAMES/rom_31.h" //Adventure Island
+//#define APP_MARKER 0xCC29
 //#include "GAMES/rom_32.h" //Adventure Island II
+//#define APP_MARKER 0xCC30
 //#include "GAMES/rom_33.h" //Castlevania II - Belmont's Revenge
+//#define APP_MARKER 0xCC31
 //#include "GAMES/rom_34.h" //Chase H.Q. 
+//#define APP_MARKER 0xCC32
 //#include "GAMES/rom_35.h" //Speedy Gonzales 
+//#define APP_MARKER 0xCC33
 //#include "GAMES/rom_36.h" //Star Wars - The Empire Strikes Back 
+//#define APP_MARKER 0xCC34
 //#include "GAMES/rom_37.h" //Super Mario Land 2 - 6 Golden Coins
+//#define APP_MARKER 0xCC35
 //#include "GAMES/rom_38.h" //Super Off Road 
+//#define APP_MARKER 0xCC36
 //#include "GAMES/rom_39.h" //Pocket_Monsters_-_Green_Version_J_V1.0_S_patched
+//#define APP_MARKER 0xCC37
 //#include "GAMES/rom_40.h" //bomberman
+//#define APP_MARKER 0xCC38
 //#include "GAMES/rom_41.h" //super chase hq
+//#define APP_MARKER 0xCC39
 //#include "GAMES/rom_42.h" //Burai Fighter Deluxe
+//#define APP_MARKER 0xCC40
 //#include "GAMES/rom_50.h" //pokemon blue
+//#define APP_MARKER 0xCC41
 
 
-#define APP_MARKER 0xCCAA
 #define WRITE_DELAY 2000
-#define CART_SIZE 10000
+#define CART_SIZE 20000
 #define GB_ROM rom
 
 File fle;
@@ -117,6 +157,7 @@ struct SaveStruct{
   uint32_t marker = APP_MARKER;
   bool  soundFlag = 1;
   bool  cartSaveFlag = 0;
+  bool  savingMarker = 0;
   uint8_t  paletteNo = 6;
   uint8_t  offset_x = 16;
   uint8_t  offset_y = 8;
@@ -167,7 +208,7 @@ void adjustOffset(){
     myESPboy.tft.drawString(F("Palette N  "), 0, 10);
     myESPboy.tft.drawString((String)realSaveStruct.paletteNo, 66, 10);
     myESPboy.tft.drawString(F("Save marker "), 0, 20);
-    if (realSaveStruct.marker) myESPboy.tft.drawString(F("ON"), 72, 20);
+    if (realSaveStruct.savingMarker) myESPboy.tft.drawString(F("ON"), 72, 20);
     else myESPboy.tft.drawString(F("OFF"), 72, 20);
     delay(150);
     while(!(nowkeys = myESPboy.getKeys())) delay(50);
@@ -177,7 +218,7 @@ void adjustOffset(){
     if (nowkeys&PAD_RIGHT && realSaveStruct.offset_x<32) realSaveStruct.offset_x++;
     if (nowkeys&PAD_ACT) previousSoundFlag = !previousSoundFlag;
     if (nowkeys&PAD_RGT) {realSaveStruct.paletteNo++; if(realSaveStruct.paletteNo==sizeof(paletteN)/sizeof(uint32_t *)) realSaveStruct.paletteNo=0;}
-    if (nowkeys&PAD_LFT) {realSaveStruct.marker = !realSaveStruct.marker;}
+    if (nowkeys&PAD_LFT) {realSaveStruct.savingMarker = !realSaveStruct.savingMarker;}
     if (nowkeys&PAD_ESC) {break;}
 
     paletteAndOffsetChangeFlag = 1;
