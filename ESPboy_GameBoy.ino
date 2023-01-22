@@ -142,7 +142,7 @@ ESPboyInit myESPboy;
 
 
 #define WRITE_DELAY 2000
-#define CART_SIZE 20000
+#define CART_SIZE 10000
 #define GB_ROM rom
 
 File fle;
@@ -151,12 +151,12 @@ uint8_t *cartSave;
 uint8_t previousSoundFlag;
 uint8_t paletteAndOffsetChangeFlag = 1;
 uint32_t timeToSave;
+bool  cartSaveFlag = 0;
 
 
 struct SaveStruct{
-  uint32_t marker = APP_MARKER;
+  uint32_t appMarker = APP_MARKER;
   bool  soundFlag = 1;
-  bool  cartSaveFlag = 0;
   bool  savingMarker = 0;
   uint8_t  paletteNo = 6;
   uint8_t  offset_x = 16;
@@ -169,7 +169,7 @@ SaveStruct defaultSaveStruct, realSaveStruct;
 struct gb_s *gb;
 enum gb_init_error_e ret;
 
-void loadFS(){
+void writeFS(){
     fle = LittleFS.open("/save.dat", "r+");
     for(uint16_t i=0; i<CART_SIZE; i++) 
       fle.write(cartSave[i]);
@@ -180,7 +180,7 @@ void loadFS(){
 void inline __attribute__((always_inline)) IRAM_ATTR readkeys(){
  static uint8_t nowkeys;
   nowkeys = myESPboy.getKeys();
-  if (nowkeys&PAD_LFT && nowkeys&PAD_RGT && realSaveStruct.cartSaveFlag == 0) adjustOffset();
+  if (nowkeys&PAD_LFT && nowkeys&PAD_RGT && cartSaveFlag == 0) adjustOffset();
   else{
     gb->direct.joypad_bits.a = (nowkeys&PAD_ACT)?0:1;
     gb->direct.joypad_bits.b = (nowkeys&PAD_ESC)?0:1;
@@ -238,14 +238,14 @@ uint8_t inline __attribute__((always_inline)) IRAM_ATTR gb_rom_read(struct gb_s 
 
 
 uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
-  if(realSaveStruct.marker){
+  if(realSaveStruct.savingMarker){
     myESPboy.tft.drawString("R", 0, 0);
     paletteAndOffsetChangeFlag=1;}
 
   if (addr<CART_SIZE){
     return cartSave[addr];}
   else {
-    if(realSaveStruct.marker){
+    if(realSaveStruct.savingMarker){
       myESPboy.tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
       paletteAndOffsetChangeFlag=1;
       delay(1000);
@@ -258,10 +258,10 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
 
 void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
   
-  realSaveStruct.cartSaveFlag = 1;
+  cartSaveFlag = 1;
   timeToSave = millis(); 
   
-  if(realSaveStruct.marker){ 
+  if(realSaveStruct.savingMarker){ 
     myESPboy.tft.drawString("W", 0, 0);
     paletteAndOffsetChangeFlag=1;
   }
@@ -270,7 +270,7 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
     cartSave[addr] = val;
   }
   else {    
-    if(realSaveStruct.marker){
+    if(realSaveStruct.savingMarker){
       myESPboy.tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
       paletteAndOffsetChangeFlag=1;}  
     //Serial.print("Save fail addr: "); Serial.println(addr);
@@ -350,7 +350,7 @@ void IRAM_ATTR sound_ISR(){
 
 bool loadparameters(){
   EEPROM.get(0, realSaveStruct);
-  if(realSaveStruct.marker != APP_MARKER){
+  if(realSaveStruct.appMarker != APP_MARKER){
     EEPROM.put(0, defaultSaveStruct);
     EEPROM.commit();
     realSaveStruct = defaultSaveStruct;
@@ -370,7 +370,7 @@ void saveparameters(){
 void setup() {
   //system_update_cpu_freq(SYS_CPU_160MHZ);
     
-  //Serial.begin(115200);
+  Serial.begin(115200);
   
   //Serial.println();
   //Serial.println(ESP.getFreeHeap());
@@ -422,7 +422,7 @@ void setup() {
     myESPboy.tft.fillScreen(TFT_BLACK);
   }
 
-  loadFS();
+  writeFS();
   
   sigmaDeltaSetup(0, F_CPU / 256);
   sigmaDeltaAttachPin(SOUNDPIN);
@@ -458,19 +458,19 @@ void loop() {
    
    gb_run_frame(gb);
  
-  if (realSaveStruct.cartSaveFlag == 1 && millis() - timeToSave > WRITE_DELAY){
+  if (cartSaveFlag == 1 && millis() - timeToSave > WRITE_DELAY){
     //Serial.println("Saving");
-    if(realSaveStruct.marker){
+    if(realSaveStruct.savingMarker){
       myESPboy.tft.drawString("S", 0, 0);
       paletteAndOffsetChangeFlag=1;}
       
     previousSoundFlag = realSaveStruct.soundFlag;
     realSaveStruct.soundFlag=0;
 
-    loadFS();
+    writeFS();
 
     realSaveStruct.soundFlag = previousSoundFlag;
-    realSaveStruct.cartSaveFlag = 0;
+    cartSaveFlag = 0;
   }
 
   while(nextScreen > micros());
