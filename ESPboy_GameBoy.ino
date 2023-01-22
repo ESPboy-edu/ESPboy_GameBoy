@@ -177,6 +177,14 @@ void writeFS(){
 };
 
 
+void loadFS(){
+    fle = LittleFS.open("/save.dat", "r+");
+    for(uint16_t i=0; i<CART_SIZE; i++) 
+      cartSave[i] = fle.read();
+    fle.close();
+};
+
+
 void inline __attribute__((always_inline)) IRAM_ATTR readkeys(){
  static uint8_t nowkeys;
   nowkeys = myESPboy.getKeys();
@@ -199,6 +207,7 @@ void adjustOffset(){
   realSaveStruct.soundFlag=0;
   gb_run_frame(gb);
   while(myESPboy.getKeys()) delay(100);
+  while(nbSPI_isBusy());
   while(1){
     myESPboy.tft.drawString(F("Adjusting LCD"), 24, 60);
     myESPboy.tft.drawString(F("up/down/left/right"), 8, 70);
@@ -239,6 +248,7 @@ uint8_t inline __attribute__((always_inline)) IRAM_ATTR gb_rom_read(struct gb_s 
 
 uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
   if(realSaveStruct.savingMarker){
+    while(nbSPI_isBusy());
     myESPboy.tft.drawString("R", 0, 0);
     paletteAndOffsetChangeFlag=1;}
 
@@ -246,6 +256,7 @@ uint8_t gb_cart_ram_read(struct gb_s *gb, const uint32_t addr){
     return cartSave[addr];}
   else {
     if(realSaveStruct.savingMarker){
+      while(nbSPI_isBusy());
       myESPboy.tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
       paletteAndOffsetChangeFlag=1;
       delay(1000);
@@ -262,6 +273,7 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
   timeToSave = millis(); 
   
   if(realSaveStruct.savingMarker){ 
+    while(nbSPI_isBusy());
     myESPboy.tft.drawString("W", 0, 0);
     paletteAndOffsetChangeFlag=1;
   }
@@ -271,6 +283,7 @@ void gb_cart_ram_write(struct gb_s *gb, const uint32_t addr, const uint8_t val){
   }
   else {    
     if(realSaveStruct.savingMarker){
+      while(nbSPI_isBusy());
       myESPboy.tft.drawString(F("ERROR: OUT OF CART!"), 0, 0);
       paletteAndOffsetChangeFlag=1;}  
     //Serial.print("Save fail addr: "); Serial.println(addr);
@@ -407,7 +420,8 @@ void setup() {
 
 
   // File system init
-  cartSave = (uint8_t *)malloc (CART_SIZE+1);  
+  cartSave = (uint8_t *)malloc (CART_SIZE+1);
+    
   LittleFS.begin();
   if (loadparameters()){
     myESPboy.tft.drawString(F("Init file system..."), 0, 0);
@@ -422,7 +436,7 @@ void setup() {
     myESPboy.tft.fillScreen(TFT_BLACK);
   }
 
-  writeFS();
+  loadFS();
   
   sigmaDeltaSetup(0, F_CPU / 256);
   sigmaDeltaAttachPin(SOUNDPIN);
@@ -460,9 +474,6 @@ void loop() {
  
   if (cartSaveFlag == 1 && millis() - timeToSave > WRITE_DELAY){
     //Serial.println("Saving");
-    if(realSaveStruct.savingMarker){
-      myESPboy.tft.drawString("S", 0, 0);
-      paletteAndOffsetChangeFlag=1;}
       
     previousSoundFlag = realSaveStruct.soundFlag;
     realSaveStruct.soundFlag=0;
