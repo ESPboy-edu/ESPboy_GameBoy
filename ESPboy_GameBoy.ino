@@ -338,8 +338,8 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_
     pixels_x = offset_xx;
     for (auto x = 0; x < 128; x++)
       currentBuf[x] = paletteNN[pixels[pixels_x++]];
-    while(nbSPI_isBusy());
-    nbSPI_writeBytes((uint8_t*)currentBuf, 256);  
+    while(nbSPI_isBusy()); nbSPI_writeBytes((uint8_t*)currentBuf, 256);  
+    //myESPboy.tft.pushColors(currentBuf, 128, false); //compatibility mode for RedPCB LCD display. you have to comment upper line and uncomment this line
 
     prevLine=line;
    }

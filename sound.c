@@ -597,7 +597,7 @@ u8 audio_update()
             audio_cycle
         );
 //out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS));
-    out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS))>>3;//make noise silent dev by 8
+    out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS))>>2;//make noise silent dev by 4
         }
     
         }
