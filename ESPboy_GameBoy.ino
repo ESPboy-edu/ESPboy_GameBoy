@@ -210,7 +210,8 @@ void adjustOffset(){
   while(1){
     delay(100);
     myESPboy.tft.drawString(F("Adjusting LCD"), 24, 60);
-    myESPboy.tft.drawString(F("up/down/left/right"), 8, 70);  
+    myESPboy.tft.drawString(F("up/down/left/right"), 8, 70);
+    myESPboy.tft.drawString(F("press B to go back"), 9, 90);   
     if (previousSoundFlag) myESPboy.tft.drawString(F("Sound ON "), 0, 0);
     else myESPboy.tft.drawString(F("Sound OFF"), 0, 0);
     myESPboy.tft.drawString(F("Palette N  "), 0, 10);
