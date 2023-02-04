@@ -59,8 +59,8 @@ ESPboyInit myESPboy;
 
 //#include "GAMES/rom_1.h"  //test rom
 //#define APP_MARKER 0xCC01
-//#include "GAMES/rom_2.h"  //super mario land
-//#define APP_MARKER 0xCC02
+#include "GAMES/rom_2.h"  //super mario land
+#define APP_MARKER 0xCC02
 //#include "GAMES/rom_3.h"  //tetris
 //#define APP_MARKER 0xCC03
 //#include "GAMES/rom_4.h"  //lemmings
@@ -73,8 +73,8 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCC07
 //#include "GAMES/rom_8.h"  //prince of persia
 //#define APP_MARKER 0xCC08
-#include "GAMES/rom_9.h"  //contra
-#define APP_MARKER 0xCC09
+//#include "GAMES/rom_9.h"  //contra
+//#define APP_MARKER 0xCC09
 //#include "GAMES/rom_10.h" //Felix the cat
 //#define APP_MARKER 0xCC10
 //#include "GAMES/rom_11.h" //Pokemon
@@ -149,7 +149,7 @@ File fle;
 
 uint8_t *cartSave;
 uint8_t previousSoundFlag;
-uint8_t paletteAndOffsetChangeFlag = 1;
+uint8_t paletteAndOffsetChangeFlag = 0;
 uint32_t timeToSave;
 bool  cartSaveFlag = 0;
 
@@ -157,6 +157,7 @@ bool  cartSaveFlag = 0;
 struct SaveStruct{
   uint32_t appMarker = APP_MARKER;
   bool  soundFlag = 1;
+  bool  forceRescale = 0;
   uint8_t  paletteNo = 3;
   uint8_t  offset_x = 16;
   uint8_t  offset_y = 8;
@@ -204,34 +205,40 @@ void inline __attribute__((always_inline)) IRAM_ATTR readkeys(){
 
 void adjustOffset(){
   static uint8_t nowkeys;
+  paletteAndOffsetChangeFlag = 1;
   previousSoundFlag = realSaveStruct.soundFlag;
   realSaveStruct.soundFlag=0;
   while(myESPboy.getKeys()) delay(100);
   while(1){
     delay(100);
     myESPboy.tft.drawString(F("Adjusting LCD"), 24, 60);
-    myESPboy.tft.drawString(F("up/down/left/right"), 8, 70);
-    myESPboy.tft.drawString(F("press B to go back"), 9, 90);   
+    myESPboy.tft.drawString(F("up/down/left/right"), 8, 70);  
+    myESPboy.tft.drawString(F("press B to go back"), 9, 90);  
     if (previousSoundFlag) myESPboy.tft.drawString(F("Sound ON "), 0, 0);
     else myESPboy.tft.drawString(F("Sound OFF"), 0, 0);
     myESPboy.tft.drawString(F("Palette N  "), 0, 10);
     myESPboy.tft.drawString((String)realSaveStruct.paletteNo, 66, 10);
+    if (realSaveStruct.forceRescale) myESPboy.tft.drawString(F("Rescale ON "), 0, 20);
+    else myESPboy.tft.drawString(F("Rescale OFF"), 0, 20);
     while(!(nowkeys = myESPboy.getKeys())) delay(50);
-    if (nowkeys&PAD_UP && realSaveStruct.offset_y>0) realSaveStruct.offset_y--;
-    if (nowkeys&PAD_DOWN && realSaveStruct.offset_y<16) realSaveStruct.offset_y++;
-    if (nowkeys&PAD_LEFT && realSaveStruct.offset_x>0) realSaveStruct.offset_x--;
-    if (nowkeys&PAD_RIGHT && realSaveStruct.offset_x<32) realSaveStruct.offset_x++;
-    if (nowkeys&PAD_ACT) previousSoundFlag = !previousSoundFlag;
+    if (!realSaveStruct.forceRescale){
+      if (nowkeys&PAD_UP && realSaveStruct.offset_y>0) realSaveStruct.offset_y--;
+      if (nowkeys&PAD_DOWN && realSaveStruct.offset_y<16) realSaveStruct.offset_y++;
+      if (nowkeys&PAD_LEFT && realSaveStruct.offset_x>0) realSaveStruct.offset_x--;
+      if (nowkeys&PAD_RIGHT && realSaveStruct.offset_x<32) realSaveStruct.offset_x++;}
+    if (nowkeys&PAD_ACT) {previousSoundFlag = !previousSoundFlag;}
     if (nowkeys&PAD_RGT) {realSaveStruct.paletteNo++; if(realSaveStruct.paletteNo==sizeof(paletteN)/sizeof(uint32_t *)) realSaveStruct.paletteNo=0;}
+    if (nowkeys&PAD_LFT) {realSaveStruct.forceRescale = !realSaveStruct.forceRescale;}
     if (nowkeys&PAD_ESC) {break;}
 
-    paletteAndOffsetChangeFlag = 1;
     gb_run_frame(gb);
     gb_run_frame(gb);
   }
 
   realSaveStruct.soundFlag = previousSoundFlag;
   saveparameters();
+  paletteAndOffsetChangeFlag = 0;
+  myESPboy.tft.fillScreen(TFT_BLACK);
 };
 
 
@@ -290,46 +297,50 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
   uint16_t *currentBuf3;
   uint8_t prevLine=0;
   bool flipBuf;
+  uint8_t *pix;
   
 
-void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, const uint_fast8_t line){
+void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, uint_fast8_t line){
   if (paletteAndOffsetChangeFlag) {
      paletteNN = (uint16_t *)paletteN[realSaveStruct.paletteNo];
      offset_xx = realSaveStruct.offset_x;
      offset_yy = realSaveStruct.offset_y;
    }
 
-  if(line >= offset_yy && line < offset_yy+128){
-    if(line != prevLine+1)
-      myESPboy.tft.setAddrWindow(0, line-offset_yy, 128, 128);
+  if(!realSaveStruct.forceRescale){
+    if (line < offset_yy || line > offset_yy+127) return;}
+  else{
+    if (!line%8) return;
+    line -= line>>3;}
+  
+  if(line != prevLine+1){
+    while(nbSPI_isBusy());
+    if (!realSaveStruct.forceRescale) myESPboy.tft.setAddrWindow(0, line-offset_yy, 128, 128);
+    else  myESPboy.tft.setAddrWindow(0, line, 128, 128);}
 
     currentBuf = flipBuf?uiBuff1:uiBuff2;
     currentBuf2 = currentBuf;
     currentBuf3 = &currentBuf[128];
-    uint8_t *pix = (uint8_t *)&pixels[offset_xx];
+
+    if (!realSaveStruct.forceRescale) pix = (uint8_t *)&pixels[offset_xx];
+    else pix = (uint8_t *)&pixels[0];
         
     while (currentBuf != currentBuf3){
       *currentBuf++ = paletteNN[(*pix++)];
       *currentBuf++ = paletteNN[(*pix++)];
       *currentBuf++ = paletteNN[(*pix++)];
+      *currentBuf++ = paletteNN[(*pix++)]; if(realSaveStruct.forceRescale) pix++;
       *currentBuf++ = paletteNN[(*pix++)];
       *currentBuf++ = paletteNN[(*pix++)];
       *currentBuf++ = paletteNN[(*pix++)];
-      *currentBuf++ = paletteNN[(*pix++)];
-      *currentBuf++ = paletteNN[(*pix++)];
+      *currentBuf++ = paletteNN[(*pix++)]; if(realSaveStruct.forceRescale) pix++;
     }
 
-    while(nbSPI_isBusy()); 
-    if(!paletteAndOffsetChangeFlag)
-       nbSPI_writeBytes((uint8_t*)currentBuf2, 256);  
-    else{
-       myESPboy.tft.pushColors(currentBuf2, 128, false); 
-       paletteAndOffsetChangeFlag = 0;
-    }
+    while(nbSPI_isBusy()); nbSPI_writeBytes((uint8_t*)currentBuf2, 256);   //unsafe but fast render method
+    //myESPboy.tft.pushColors(currentBuf2, 128, false); //safe but slow render method 
 
     prevLine = line;
     flipBuf = !flipBuf;
-   }
 }
 
 
@@ -373,7 +384,7 @@ void setup() {
   //Serial.println(ESP.getFreeHeap());
   
 
-  myESPboy.begin("GameBoy emu 2.2");
+  myESPboy.begin("GameBoy emu 2.3");
 
 //Check OTA2
 //  if (myESPboy.getKeys()&PAD_ACT || myESPboy.getKeys()&PAD_ESC) { 
@@ -390,20 +401,6 @@ void setup() {
 
 //EEPROM init (for game cart RAM)  
   EEPROM.begin(sizeof(SaveStruct));
-
-// init game boy emulator
-   gb = new gb_s;
-
-   ret = gb_init(gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
-
-	//if(ret != GB_INIT_NO_ERROR){
-		//Serial.print("Error: ");
-		//Serial.println(ret);}
-
-	  gb_init_lcd(gb, &lcd_draw_line);
-    gb->direct.interlace = 0;
-    gb->direct.frame_skip = 1;
-
 
   // File system init
   cartSave = (uint8_t *)malloc (CART_SIZE+1);
@@ -423,13 +420,28 @@ void setup() {
   }
 
   loadFS();
+
+  paletteNN = (uint16_t *)paletteN[realSaveStruct.paletteNo];
+  offset_xx = realSaveStruct.offset_x;
+  offset_yy = realSaveStruct.offset_y;
+
+// init game boy emulator
+   gb = new gb_s;
+
+   ret = gb_init(gb, &gb_rom_read, &gb_cart_ram_read, &gb_cart_ram_write, &gb_error, NULL);
+
+  //if(ret != GB_INIT_NO_ERROR){
+    //Serial.print("Error: ");
+    //Serial.println(ret);}
+
+    gb_init_lcd(gb, &lcd_draw_line);
+    gb->direct.interlace = 0;
+    gb->direct.frame_skip = 1;
   
   sigmaDeltaSetup(0, F_CPU / 256);
   sigmaDeltaAttachPin(SOUNDPIN);
   sigmaDeltaEnable();
-
   sound_dac = 0;
-
   noInterrupts();
   timer1_isr_init();
   timer1_attachInterrupt(sound_ISR);
