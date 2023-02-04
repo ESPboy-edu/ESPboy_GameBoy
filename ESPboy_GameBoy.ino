@@ -144,20 +144,25 @@ ESPboyInit myESPboy;
 #define WRITE_DELAY 2000
 #define CART_SIZE 10000
 #define GB_ROM rom
+#define RECALCULATE_SOUND 1000
 
 File fle;
 
-uint8_t *cartSave;
-uint8_t previousSoundFlag;
-uint8_t paletteAndOffsetChangeFlag = 0;
+uint8_t  *cartSave;
+uint8_t  previousSoundFlag;
+uint8_t  paletteAndOffsetChangeFlag = 0;
 uint32_t timeToSave;
-bool  cartSaveFlag = 0;
+bool     cartSaveFlag = 0;
 
+int32_t maxout=0;
+int32_t minch1=0, minch2=0, minch3=0, minch4=0;
+uint32_t countertime;
+uint32_t divider=64;
 
 struct SaveStruct{
   uint32_t appMarker = APP_MARKER;
-  bool  soundFlag = 1;
-  bool  forceRescale = 0;
+  bool     soundFlag = 1;
+  bool     forceRescale = 0;
   uint8_t  paletteNo = 3;
   uint8_t  offset_x = 16;
   uint8_t  offset_y = 8;
@@ -210,7 +215,7 @@ void adjustOffset(){
   realSaveStruct.soundFlag=0;
   while(myESPboy.getKeys()) delay(100);
   while(1){
-    delay(100);
+    delay(200);
     myESPboy.tft.drawString(F("Adjusting LCD"), 24, 60);
     myESPboy.tft.drawString(F("up/down/left/right"), 8, 70);  
     myESPboy.tft.drawString(F("press B to go back"), 9, 90);  
@@ -310,7 +315,7 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, uint_fast8_
   if(!realSaveStruct.forceRescale){
     if (line < offset_yy || line > offset_yy+127) return;}
   else{
-    if (!line%8) return;
+    if (!(line%8)) return;
     line -= line>>3;}
   
   if(line != prevLine+1){
@@ -344,14 +349,10 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, uint_fast8_
 }
 
 
-volatile uint8_t sound_dac;
 
 void IRAM_ATTR sound_ISR(){
-  static bool sound_prev;
-  if(realSaveStruct.soundFlag && sound_prev!=sound_dac){
-    sigmaDeltaWrite(0, sound_dac);
-    sound_dac = audio_update();}
-  sound_prev = !sound_prev;
+  if(realSaveStruct.soundFlag)
+    sigmaDeltaWrite(0, audio_update());
 }
 
 
@@ -378,7 +379,7 @@ void saveparameters(){
 void setup() {
   //system_update_cpu_freq(SYS_CPU_160MHZ);
     
-  //Serial.begin(115200);
+  Serial.begin(115200);
   
   //Serial.println();
   //Serial.println(ESP.getFreeHeap());
@@ -441,14 +442,14 @@ void setup() {
   sigmaDeltaSetup(0, F_CPU / 256);
   sigmaDeltaAttachPin(SOUNDPIN);
   sigmaDeltaEnable();
-  sound_dac = 0;
   noInterrupts();
   timer1_isr_init();
   timer1_attachInterrupt(sound_ISR);
   timer1_enable(TIM_DIV1, TIM_EDGE, TIM_LOOP);
   timer1_write(80 * 1000000 / SAMPLING_RATE);//AUDIO_SAMPLE_RATE);
   interrupts();
-  
+
+  countertime=millis();
   //Serial.println(ESP.getFreeHeap());
 
   myESPboy.tft.setAddrWindow(0, 0, 128, 128);
@@ -458,12 +459,12 @@ void setup() {
 
 #define FRAME_TIME 16600
 uint32_t nextScreen;
-bool everysecondgetkey;
+bool passGetkey;
 
 void loop() { 
 
-   if(everysecondgetkey) readkeys();
-   everysecondgetkey = !everysecondgetkey;
+   if(passGetkey) readkeys();
+   passGetkey = !passGetkey;
 
    nextScreen = micros() + FRAME_TIME ;
    
@@ -480,6 +481,11 @@ void loop() {
     realSaveStruct.soundFlag = previousSoundFlag;
     cartSaveFlag = 0;
   }
+
+  if (millis() > countertime+RECALCULATE_SOUND){
+    countertime = millis();
+    divider = (maxout>>8)+1;
+  };
 
   while(nextScreen > micros());
 };

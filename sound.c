@@ -501,6 +501,13 @@ s16 GENERATE_NOISE(u8 vol, u8 tone)
         return sample;
     }
 
+
+
+    extern int32_t maxout;
+    extern uint8_t divider;
+    extern int32_t minch1, minch2, minch3, minch4;
+    int32_t ch;
+    
 /*
     Handle audio logic and generate sound at 256hz
 */
@@ -509,7 +516,7 @@ u8 audio_update()
     /*
         Audio buffer housekeeping.
     */
-    s16 out=0;
+    int32_t out=0;
 
     // check APU power
     if (SO.power) 
@@ -526,8 +533,8 @@ u8 audio_update()
         audio_cycle
     );
 
-    if (CH1.channel.enable && 1)
-        {
+    //if (CH1.channel.enable && 1)
+    //    {
         SWEEP_UPDATE(
             &CH1.channel,
             &CH1.sweep,
@@ -539,12 +546,14 @@ u8 audio_update()
             audio_cycle
         );
 
-        out+=GENERATE_WAVE(
+        ch=GENERATE_WAVE(
             CH1.channel.freq,
             CH1.envelope.volume,
             CH1.duty_len.duty
         );
-        }
+        if(ch<minch1)minch1=ch;
+        out+=ch-minch1;
+      //  }
 
     // Channel 2
 
@@ -554,19 +563,21 @@ u8 audio_update()
         audio_cycle
     );
 
-    if (CH2.channel.enable && 1)
-        {
+    //if (CH2.channel.enable && 1)
+    //    {
         ENVELOPE_UPDATE(
             &CH2.envelope,
             audio_cycle
         );
 
-        out+=GENERATE_WAVE(
+        ch=GENERATE_WAVE(
             CH2.channel.freq,
             CH2.envelope.volume,
             CH2.duty_len.duty
         );
-        }
+        if(ch<minch2)minch2=ch;
+        out+=ch-minch2;      
+      //  }
 
 
     // Channel 3
@@ -576,10 +587,12 @@ u8 audio_update()
         64 - CH3.sound_len,
         audio_cycle);
 
-    if (CH3.channel.enable && 1)
-        {
-        out+=GENERATE_CH3(CH3.channel.freq, CH3.out_level);
-        }
+    //if (CH3.channel.enable && 1)
+    //    {
+        ch=GENERATE_CH3(CH3.channel.freq, CH3.out_level);
+        if(ch<minch3)minch3=ch;
+        out+=ch-minch3;
+    //    }
 
 
     // Channel 4
@@ -590,20 +603,25 @@ u8 audio_update()
         audio_cycle
         );
 
-    if (CH4.channel.enable && 1)
-        {
+    //if (CH4.channel.enable && 1)
+    //    {
         ENVELOPE_UPDATE(
             &CH4.envelope,
             audio_cycle
         );
-//out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS));
-    out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS))>>2;//make noise silent dev by 4
-        }
+    //out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS));
+    ch=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS))>>1;//make noise silent dev by 2
+    if(ch<minch3)minch3=ch;
+    out+=ch-minch3;
+     //   }
     
         }
 
 ++audio_cycle;
 ++sample_count;
 
-    return (out>>4)+128;
+    if (out>maxout)maxout=out;
+
+    out = out/divider;
+    return (out);
     }
