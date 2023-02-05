@@ -144,7 +144,6 @@ ESPboyInit myESPboy;
 #define WRITE_DELAY 2000
 #define CART_SIZE 10000
 #define GB_ROM rom
-#define RECALCULATE_SOUND 1000
 
 File fle;
 
@@ -156,7 +155,6 @@ bool     cartSaveFlag = 0;
 
 int32_t maxout=0;
 int32_t minch1=0, minch2=0, minch3=0, minch4=0;
-uint32_t countertime;
 uint32_t divider=64;
 
 struct SaveStruct{
@@ -173,6 +171,7 @@ SaveStruct defaultSaveStruct, realSaveStruct;
 
 struct gb_s *gb;
 enum gb_init_error_e ret;
+
 
 void writeFS(){
     delay(100);
@@ -297,11 +296,13 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
   uint_fast8_t offset_yy;
   uint16_t uiBuff1[128] __attribute__((aligned(32)));
   uint16_t uiBuff2[128] __attribute__((aligned(32)));
+  uint8_t uiBuff3[160];
   uint16_t *currentBuf;
   uint16_t *currentBuf2;
   uint16_t *currentBuf3;
   uint8_t prevLine=0;
   bool flipBuf;
+  bool skippedLineFlag = 0;
   uint8_t *pix;
   
 
@@ -315,7 +316,7 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, uint_fast8_
   if(!realSaveStruct.forceRescale){
     if (line < offset_yy || line > offset_yy+127) return;}
   else{
-    if (!(line%8)) return;
+    if (!(line%8)) {memcpy(uiBuff3, pixels, 160); skippedLineFlag = 1; return;}
     line -= line>>3;}
   
   if(line != prevLine+1){
@@ -329,17 +330,37 @@ void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, uint_fast8_
 
     if (!realSaveStruct.forceRescale) pix = (uint8_t *)&pixels[offset_xx];
     else pix = (uint8_t *)&pixels[0];
-        
+
+  if(skippedLineFlag){
+    skippedLineFlag=0;  
+    uint8_t *pixx = &uiBuff3[0];
+    while (currentBuf != currentBuf3){  
+      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
+      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
+      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
+      if(!realSaveStruct.forceRescale) {*currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;}
+      else {*currentBuf++ = paletteNN[(pix[0]+pix[1]+pixx[0]+pixx[1])>>2]; pix+= 2; pixx+= 2;}
+      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
+      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
+      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
+      if(!realSaveStruct.forceRescale) {*currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;}
+      else {*currentBuf++ = paletteNN[(pix[0]+pix[1]+pixx[0]+pixx[1])>>2]; pix+= 2; pixx+= 2;}
+    }
+  }
+  else{      
     while (currentBuf != currentBuf3){
       *currentBuf++ = paletteNN[(*pix++)];
       *currentBuf++ = paletteNN[(*pix++)];
       *currentBuf++ = paletteNN[(*pix++)];
-      *currentBuf++ = paletteNN[(*pix++)]; if(realSaveStruct.forceRescale) pix++;
+      if(!realSaveStruct.forceRescale) *currentBuf++ = paletteNN[(*pix++)];
+      else {*currentBuf++ = paletteNN[(pix[0]+pix[1])>>1]; pix+= 2;}
       *currentBuf++ = paletteNN[(*pix++)];
       *currentBuf++ = paletteNN[(*pix++)];
       *currentBuf++ = paletteNN[(*pix++)];
-      *currentBuf++ = paletteNN[(*pix++)]; if(realSaveStruct.forceRescale) pix++;
+      if(!realSaveStruct.forceRescale) *currentBuf++ = paletteNN[(*pix++)];
+      else {*currentBuf++ = paletteNN[(pix[0]+pix[1])>>1]; pix+= 2;}
     }
+  }
 
     while(nbSPI_isBusy()); nbSPI_writeBytes((uint8_t*)currentBuf2, 256);   //unsafe but fast render method
     //myESPboy.tft.pushColors(currentBuf2, 128, false); //safe but slow render method 
@@ -379,13 +400,12 @@ void saveparameters(){
 void setup() {
   //system_update_cpu_freq(SYS_CPU_160MHZ);
     
-  Serial.begin(115200);
+  //Serial.begin(115200);
   
   //Serial.println();
   //Serial.println(ESP.getFreeHeap());
-  
 
-  myESPboy.begin("GameBoy emu 2.3");
+  myESPboy.begin("GameBoy emu 2.4");
 
 //Check OTA2
 //  if (myESPboy.getKeys()&PAD_ACT || myESPboy.getKeys()&PAD_ESC) { 
@@ -449,7 +469,6 @@ void setup() {
   timer1_write(80 * 1000000 / SAMPLING_RATE);//AUDIO_SAMPLE_RATE);
   interrupts();
 
-  countertime=millis();
   //Serial.println(ESP.getFreeHeap());
 
   myESPboy.tft.setAddrWindow(0, 0, 128, 128);
@@ -459,33 +478,26 @@ void setup() {
 
 #define FRAME_TIME 16600
 uint32_t nextScreen;
-bool passGetkey;
+uint8_t passGetkey;
 
-void loop() { 
-
-   if(passGetkey) readkeys();
-   passGetkey = !passGetkey;
-
+void loop() {
    nextScreen = micros() + FRAME_TIME ;
+   
+   if(passGetkey > 5){
+      readkeys();
+      divider = (maxout>>8)+1;
+      passGetkey=0;}
+   passGetkey++;
    
    gb_run_frame(gb);
  
-  if (cartSaveFlag == 1 && millis() - timeToSave > WRITE_DELAY){
-    //Serial.println("Saving");
-      
+  if (cartSaveFlag && millis() - timeToSave > WRITE_DELAY){
     previousSoundFlag = realSaveStruct.soundFlag;
     realSaveStruct.soundFlag=0;
-
     writeFS();
-
     realSaveStruct.soundFlag = previousSoundFlag;
     cartSaveFlag = 0;
   }
-
-  if (millis() > countertime+RECALCULATE_SOUND){
-    countertime = millis();
-    divider = (maxout>>8)+1;
-  };
 
   while(nextScreen > micros());
 };
