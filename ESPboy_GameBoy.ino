@@ -58,87 +58,98 @@ ESPboyInit myESPboy;
   
 
 //#include "GAMES/rom_1.h"  //test rom
-//#define APP_MARKER 0xCC01
+//#define APP_MARKER 0xCA01
 #include "GAMES/rom_2.h"  //super mario land
-#define APP_MARKER 0xCC02
+#define APP_MARKER 0xCA02
 //#include "GAMES/rom_3.h"  //tetris
-//#define APP_MARKER 0xCC03
+//#define APP_MARKER 0xCA03
 //#include "GAMES/rom_4.h"  //lemmings
-//#define APP_MARKER 0xCC04
+//#define APP_MARKER 0xCA04
 //#include "GAMES/rom_5.h"  //kirby's dream land
-//#define APP_MARKER 0xCC05
+//#define APP_MARKER 0xCA05
 //#include "GAMES/rom_6.h"  //mega man
-//#define APP_MARKER 0xCC06
+//#define APP_MARKER 0xCA06
 //#include "GAMES/rom_7.h"  //zelda
-//#define APP_MARKER 0xCC07
+//#define APP_MARKER 0xCA07
 //#include "GAMES/rom_8.h"  //prince of persia
-//#define APP_MARKER 0xCC08
+//#define APP_MARKER 0xCA08
 //#include "GAMES/rom_9.h"  //contra
-//#define APP_MARKER 0xCC09
+//#define APP_MARKER 0xCA09
 //#include "GAMES/rom_10.h" //Felix the cat
-//#define APP_MARKER 0xCC10
+//#define APP_MARKER 0xCA10
 //#include "GAMES/rom_11.h" //Pokemon
-//#define APP_MARKER 0xCC11
+//#define APP_MARKER 0xCA11
 //#include "GAMES/rom_12.h" //Castelian
-//#define APP_MARKER 0xCC12
+//#define APP_MARKER 0xCA12
 //#include "GAMES/rom_13.h" //Castelvania
-//#define APP_MARKER 0xCC13
+//#define APP_MARKER 0xCA13
 //#include "GAMES/rom_14.h" //Donkey Kong Land
-//#define APP_MARKER 0xCC14
+//#define APP_MARKER 0xCA14
 //#include "GAMES/rom_15.h" //Double dragon
-//#define APP_MARKER 0xCC15
+//#define APP_MARKER 0xCA15
 //#include "GAMES/rom_16.h" //R-type
-//#define APP_MARKER 0xCC16
+//#define APP_MARKER 0xCA16
 //#include "GAMES/rom_17.h" //Mega man III
-//#define APP_MARKER 0xCC17
+//#define APP_MARKER 0xCA17
 //#include "GAMES/rom_18.h" //R-type II
-//#define APP_MARKER 0xCC18
+//#define APP_MARKER 0xCA18
 //#include "GAMES/rom_19.h" //nemezis
-//#define APP_MARKER 0xCC19
+//#define APP_MARKER 0xCA19
 //#include "GAMES/rom_20.h" //ninja gaiden shadow
-//#define APP_MARKER 0xCC20
+//#define APP_MARKER 0xCA20
 //#include "GAMES/rom_21.h" //spy vs spy
-//#define APP_MARKER 0xCC21
+//#define APP_MARKER 0xCA21
 //#include "GAMES/rom_22.h" //Robocop
-//#define APP_MARKER 0xCC22
+//#define APP_MARKER 0xCA22
 //#include "GAMES/rom_23.h" //Solar Striker
-//#define APP_MARKER 0xCC23
+//#define APP_MARKER 0xCA23
 //#include "GAMES/rom_26.h" //Mortal Combat
-//#define APP_MARKER 0xCC24
+//#define APP_MARKER 0xCA26
 //#include "GAMES/rom_27.h" //Mortal Combat 2
-//#define APP_MARKER 0xCC25
+//#define APP_MARKER 0xCA27
 //#include "GAMES/rom_28.h" //Pokemon blue
-//#define APP_MARKER 0xCC26
+//#define APP_MARKER 0xCA28
 //#include "GAMES/rom_29.h" //Q-bert
-//#define APP_MARKER 0xCC27
+//#define APP_MARKER 0xCA29
 //#include "GAMES/rom_30.h" //PacMan
-//#define APP_MARKER 0xCC28
+//#define APP_MARKER 0xCA30
 //#include "GAMES/rom_31.h" //Adventure Island
-//#define APP_MARKER 0xCC29
+//#define APP_MARKER 0xCA31
 //#include "GAMES/rom_32.h" //Adventure Island II
-//#define APP_MARKER 0xCC30
+//#define APP_MARKER 0xCA32
 //#include "GAMES/rom_33.h" //Castlevania II - Belmont's Revenge
-//#define APP_MARKER 0xCC31
+//#define APP_MARKER 0xCA33
 //#include "GAMES/rom_34.h" //Chase H.Q. 
-//#define APP_MARKER 0xCC32
+//#define APP_MARKER 0xCA34
 //#include "GAMES/rom_35.h" //Speedy Gonzales 
-//#define APP_MARKER 0xCC33
+//#define APP_MARKER 0xCA35
 //#include "GAMES/rom_36.h" //Star Wars - The Empire Strikes Back 
-//#define APP_MARKER 0xCC34
+//#define APP_MARKER 0xCA36
 //#include "GAMES/rom_37.h" //Super Mario Land 2 - 6 Golden Coins
-//#define APP_MARKER 0xCC35
+//#define APP_MARKER 0xCA37
 //#include "GAMES/rom_38.h" //Super Off Road 
-//#define APP_MARKER 0xCC36
+//#define APP_MARKER 0xCA38
 //#include "GAMES/rom_39.h" //Pocket_Monsters_-_Green_Version_J_V1.0_S_patched
-//#define APP_MARKER 0xCC37
+//#define APP_MARKER 0xCA39
 //#include "GAMES/rom_40.h" //bomberman
-//#define APP_MARKER 0xCC38
+//#define APP_MARKER 0xCA40
 //#include "GAMES/rom_41.h" //super chase hq
-//#define APP_MARKER 0xCC39
+//#define APP_MARKER 0xCA41
 //#include "GAMES/rom_42.h" //Burai Fighter Deluxe
-//#define APP_MARKER 0xCC40
+//#define APP_MARKER 0xCA42
+
+//#include "GAMES/rom_43.h" //Navy Seals (USA, Europe)
+//#define APP_MARKER 0xCA43
+//#include "GAMES/rom_44.h" //Tamagotchi (UE) [S][!]
+//#define APP_MARKER 0xCA44
+//#include "GAMES/rom_45.h" //Tiny Toon Adventures - Babs' Big Break (E) [!]
+//#define APP_MARKER 0xCA45
+//#include "GAMES/rom_46.h" //Yoshi (U) [!]
+//#define APP_MARKER 0xCA46
+//#include "GAMES/rom_47.h" //Donkey Kong (JU) (V1.1) [S][!]
+//#define APP_MARKER 0xCA47
 //#include "GAMES/rom_50.h" //pokemon blue
-//#define APP_MARKER 0xCC41
+//#define APP_MARKER 0xCA50
 
 
 #define WRITE_DELAY 2000
@@ -160,7 +171,7 @@ uint32_t divider=64;
 struct SaveStruct{
   uint32_t appMarker = APP_MARKER;
   bool     soundFlag = 1;
-  bool     forceRescale = 0;
+  bool     forceRescale = 1;
   uint8_t  paletteNo = 3;
   uint8_t  offset_x = 16;
   uint8_t  offset_y = 8;
@@ -476,14 +487,12 @@ void setup() {
 
 
 
-#define FRAME_TIME 16600
+#define FRAME_TIME 12000
 uint32_t nextScreen;
 uint8_t passGetkey;
 
-void loop() {
-   nextScreen = micros() + FRAME_TIME ;
-   
-   if(passGetkey > 5){
+void loop() {   
+   if(passGetkey > 4){
       readkeys();
       divider = (maxout>>8)+1;
       passGetkey=0;}
@@ -500,4 +509,5 @@ void loop() {
   }
 
   while(nextScreen > micros());
+  nextScreen = micros() + FRAME_TIME ;
 };
