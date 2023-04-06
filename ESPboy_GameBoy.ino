@@ -148,8 +148,18 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA46
 //#include "GAMES/rom_47.h" //Donkey Kong (JU) (V1.1) [S][!]
 //#define APP_MARKER 0xCA47
+//#include "GAMES/rom_48.h" //F-1 Race (World)
+//#define APP_MARKER 0xCA48
+//#include "GAMES/rom_49.h" //Final Fantasy Adventure (USA)
+//#define APP_MARKER 0xCA49
 //#include "GAMES/rom_50.h" //pokemon blue
 //#define APP_MARKER 0xCA50
+//#include "GAMES/rom_51.h" //Game & Watch Gallery (Europe) (SGB Enhanced)
+//#define APP_MARKER 0xCA51
+//#include "GAMES/rom_52.h" //Space Invaders (U) [S][!]
+//#define APP_MARKER 0xCA52
+//#include "GAMES/rom_53.h" Worms (Europe)
+//#define APP_MARKER 0xCA53
 
 
 #define WRITE_DELAY 2000
