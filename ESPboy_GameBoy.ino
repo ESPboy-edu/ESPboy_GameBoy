@@ -16,6 +16,7 @@ MIT license
 #pragma GCC push_options
 
 #include "Arduino.h"
+#include <mmu_iram.h>
 
 #include "lib/ESPboyInit.h"
 #include "lib/ESPboyInit.cpp"
@@ -59,8 +60,8 @@ ESPboyInit myESPboy;
 
 //#include "GAMES/rom_1.h"  //test rom
 //#define APP_MARKER 0xCA01
-#include "GAMES/rom_2.h"  //super mario land
-#define APP_MARKER 0xCA02
+//#include "GAMES/rom_2.h"  //super mario land
+//#define APP_MARKER 0xCA02
 //#include "GAMES/rom_3.h"  //tetris
 //#define APP_MARKER 0xCA03
 //#include "GAMES/rom_4.h"  //lemmings
@@ -73,8 +74,8 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA07
 //#include "GAMES/rom_8.h"  //prince of persia
 //#define APP_MARKER 0xCA08
-//#include "GAMES/rom_9.h"  //contra
-//#define APP_MARKER 0xCA09
+#include "GAMES/rom_9.h"  //contra
+#define APP_MARKER 0xCA09
 //#include "GAMES/rom_10.h" //Felix the cat
 //#define APP_MARKER 0xCA10
 //#include "GAMES/rom_11.h" //Pokemon
@@ -268,7 +269,8 @@ void adjustOffset(){
 
 
 uint8_t inline __attribute__((always_inline)) IRAM_ATTR gb_rom_read(struct gb_s *gb, const uint32_t addr){
-  return pgm_read_byte(GB_ROM+addr);
+  return mmu_get_uint8(GB_ROM+addr);
+  //return pgm_read_byte(GB_ROM+addr);
 }
 
 

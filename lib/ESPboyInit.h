@@ -11,8 +11,8 @@ v1.0
 #include <Arduino.h>
 #include <Adafruit_MCP23017.h> //to control buttons
 #include <Adafruit_MCP4725.h>  //to control the LCD display backlit
-//#include "ESPboyLED.h"
-//#include "ESPboyLED.cpp"
+#include "ESPboyLED.h"
+#include "ESPboyLED.cpp"
 #include "ESPboylogo.h"
 
 #include <TFT_eSPI.h>          //to draw at LCD TFT
@@ -45,7 +45,7 @@ public:
   Adafruit_MCP23017 mcp;
   Adafruit_MCP4725 dac;
   TFT_eSPI tft;
-  //ESPboyLED myLED;
+  ESPboyLED myLED;
 
   ESPboyInit();
   void begin(const char *appName);
