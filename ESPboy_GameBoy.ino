@@ -60,8 +60,8 @@ ESPboyInit myESPboy;
 
 //#include "GAMES/rom_1.h"  //test rom
 //#define APP_MARKER 0xCA01
-//#include "GAMES/rom_2.h"  //super mario land
-//#define APP_MARKER 0xCA02
+#include "GAMES/rom_2.h"  //super mario land
+#define APP_MARKER 0xCA02
 //#include "GAMES/rom_3.h"  //tetris
 //#define APP_MARKER 0xCA03
 //#include "GAMES/rom_4.h"  //lemmings
@@ -74,8 +74,8 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA07
 //#include "GAMES/rom_8.h"  //prince of persia
 //#define APP_MARKER 0xCA08
-#include "GAMES/rom_9.h"  //contra
-#define APP_MARKER 0xCA09
+//#include "GAMES/rom_9.h"  //contra
+//#define APP_MARKER 0xCA09
 //#include "GAMES/rom_10.h" //Felix the cat
 //#define APP_MARKER 0xCA10
 //#include "GAMES/rom_11.h" //Pokemon
@@ -138,7 +138,6 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA41
 //#include "GAMES/rom_42.h" //Burai Fighter Deluxe
 //#define APP_MARKER 0xCA42
-
 //#include "GAMES/rom_43.h" //Navy Seals (USA, Europe)
 //#define APP_MARKER 0xCA43
 //#include "GAMES/rom_44.h" //Tamagotchi (UE) [S][!]
@@ -153,14 +152,17 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA48
 //#include "GAMES/rom_49.h" //Final Fantasy Adventure (USA)
 //#define APP_MARKER 0xCA49
-//#include "GAMES/rom_50.h" //pokemon blue
-//#define APP_MARKER 0xCA50
 //#include "GAMES/rom_51.h" //Game & Watch Gallery (Europe) (SGB Enhanced)
 //#define APP_MARKER 0xCA51
 //#include "GAMES/rom_52.h" //Space Invaders (U) [S][!]
 //#define APP_MARKER 0xCA52
 //#include "GAMES/rom_53.h" Worms (Europe)
 //#define APP_MARKER 0xCA53
+//#include "GAMES/rom_54.h" //harvest_moon(USA)
+//#define APP_MARKER 0xCA54
+//#include "GAMES/rom_55.h" //Warioland (Super Marioland 3)
+//#define APP_MARKER 0xCA55
+
 
 
 #define WRITE_DELAY 2000
@@ -428,7 +430,7 @@ void setup() {
   //Serial.println();
   //Serial.println(ESP.getFreeHeap());
 
-  myESPboy.begin("GameBoy emu 2.4");
+  myESPboy.begin("GameBoy emu 2.5");
 
 //Check OTA2
 //  if (myESPboy.getKeys()&PAD_ACT || myESPboy.getKeys()&PAD_ESC) { 
@@ -482,7 +484,7 @@ void setup() {
     gb->direct.interlace = 0;
     gb->direct.frame_skip = 1;
   
-  sigmaDeltaSetup(0, F_CPU / 256);
+  sigmaDeltaSetup(0, 300000);
   sigmaDeltaAttachPin(SOUNDPIN);
   sigmaDeltaEnable();
   noInterrupts();

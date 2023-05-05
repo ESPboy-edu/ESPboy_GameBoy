@@ -28,8 +28,6 @@
  * SameBoy, and code marked as being taken from SameBoy,
  * is Copyright (c) 2015-2019 Lior Halphon.
  */
-#pragma GCC optimize ("-O3")
-#pragma GCC push_options
 
 #ifndef PEANUT_GB_H
 #define PEANUT_GB_H
@@ -178,8 +176,8 @@
 /** LCD characteristics **/
 /* PPU cycles through modes every 456 cycles. */
 #define LCD_LINE_CYCLES     456
-/* Mode 0 starts on cycle 0. */
-#define LCD_MODE_0_CYCLES   0
+/* Mode 0 starts on cycle 372. */
+#define LCD_MODE_0_CYCLES   372
 /* Mode 2 starts on cycle 204. */
 #define LCD_MODE_2_CYCLES   204
 /* Mode 3 starts on cycle 284. */
@@ -228,15 +226,15 @@
 
 /* The PGB_UNREACHABLE() macro tells the compiler that the code path will never
  * be reached, allowing for further optimisation. */
-//#if !defined(PGB_UNREACHABLE)
-//# if __has_builtin(__builtin_unreachable)
-//#  define PGB_UNREACHABLE() __builtin_unreachable()
-//# elif defined(_MSC_VER)
-//#  define PGB_UNREACHABLE() __assume(0)
-//# else
-#  define PGB_UNREACHABLE() //abort()
-//# endif
-//#endif /* !defined(PGB_UNREACHABLE) */
+#if !defined(PGB_UNREACHABLE)
+# if __has_builtin(__builtin_unreachable)
+#  define PGB_UNREACHABLE() __builtin_unreachable()
+# elif defined(_MSC_VER)
+#  define PGB_UNREACHABLE() __assume(0)
+# else
+#  define PGB_UNREACHABLE() abort()
+# endif
+#endif /* !defined(PGB_UNREACHABLE) */
 
 #if PEANUT_GB_USE_INTRINSICS
 /* If using MSVC, only enable intrinsics for x86 platforms*/
@@ -551,7 +549,7 @@ struct gb_s
 	uint8_t cart_ram;
 	/* Number of ROM banks in cartridge. */
 	uint16_t num_rom_banks_mask;
-	/* Number of RAM banks in cartridge. */
+	/* Number of RAM banks in cartridge. Ignore for MBC2. */
 	uint8_t num_ram_banks;
 
 	uint16_t selected_rom_bank;
@@ -696,7 +694,7 @@ struct gb_s
  * Internal function used to read bytes.
  * addr is host platform endian.
  */
-uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
+uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 {
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
@@ -734,6 +732,12 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 		{
 			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 				return gb->cart_rtc[gb->cart_ram_bank - 0x08];
+			else if(gb->mbc == 2)
+			{
+				/* Only 9 bits are available in address. */
+				addr &= 0x1FF;
+				return gb->gb_cart_ram_read(gb, addr);
+			}
 			else if((gb->cart_mode_select || gb->mbc != 1) &&
 					gb->cart_ram_bank < gb->num_ram_banks)
 			{
@@ -793,25 +797,25 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 	/* Return address that caused read error. */
 	(gb->gb_error)(gb, GB_INVALID_READ, addr);
 	PGB_UNREACHABLE();
-	return 0;
 }
 
 /**
  * Internal function used to write bytes.
  */
-void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
+void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 {
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
 	case 0x0:
 	case 0x1:
-		if(gb->mbc == 2 && addr & 0x10)
-			return;
-		else if(gb->mbc > 0 && gb->cart_ram)
+		/* Set RAM enable bit. MBC2 is handled in fall-through. */
+		if(gb->mbc > 0 && gb->mbc != 2 && gb->cart_ram)
+		{
 			gb->enable_cart_ram = ((val & 0x0F) == 0x0A);
+			return;
+		}
 
-		return;
-
+	/* Intentional fall through. */
 	case 0x2:
 		if(gb->mbc == 5)
 		{
@@ -822,7 +826,6 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 
 	/* Intentional fall through. */
-
 	case 0x3:
 		if(gb->mbc == 1)
 		{
@@ -832,12 +835,22 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 			if((gb->selected_rom_bank & 0x1F) == 0x00)
 				gb->selected_rom_bank++;
 		}
-		else if(gb->mbc == 2 && addr & 0x10)
+		else if(gb->mbc == 2)
 		{
-			gb->selected_rom_bank = val & 0x0F;
-
-			if(!gb->selected_rom_bank)
-				gb->selected_rom_bank++;
+			/* If bit 8 is 1, then set ROM bank number. */
+			if(addr & 0x100)
+			{
+				gb->selected_rom_bank = val & 0x0F;
+				/* Setting ROM bank to 0, sets it to 1. */
+				if(!gb->selected_rom_bank)
+					gb->selected_rom_bank++;
+			}
+			/* Otherwise set whether RAM is enabled or not. */
+			else
+			{
+				gb->enable_cart_ram = ((val & 0x0F) == 0x0A);
+				return;
+			}
 		}
 		else if(gb->mbc == 3)
 		{
@@ -879,10 +892,19 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 	case 0xA:
 	case 0xB:
+		/* Do not write to RAM if unavailable or disabled. */
 		if(gb->cart_ram && gb->enable_cart_ram)
 		{
 			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 				gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
+			else if(gb->mbc == 2)
+			{
+				/* Only 9 bits are available in address. */
+				addr &= 0x1FF;
+				/* Data is only 4 bits wide in MBC2 RAM. */
+				val &= 0x0F;
+				gb->gb_cart_ram_write(gb, addr, val);
+			}
 			else if(gb->cart_mode_select &&
 					gb->cart_ram_bank < gb->num_ram_banks)
 			{
@@ -992,35 +1014,37 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		/* LCD Registers */
 		case 0x40:
-			if(((gb->hram_io[IO_LCDC] & LCDC_ENABLE) == 0) &&
-				(val & LCDC_ENABLE))
-			{
-				gb->counter.lcd_count = 0;
-				gb->lcd_blank = 1;
-			}
+		{
+			uint8_t lcd_enabled;
+
+			/* Check if LCD is already enabled. */
+			lcd_enabled = (gb->hram_io[IO_LCDC] & LCDC_ENABLE);
 
 			gb->hram_io[IO_LCDC] = val;
 
-			/* LY fixed to 0 when LCD turned off. */
-			if((gb->hram_io[IO_LCDC] & LCDC_ENABLE) == 0)
+			/* Check if LCD is going to be switched on. */
+			if (!lcd_enabled && (val & LCDC_ENABLE))
 			{
-				/* Do not turn off LCD outside of VBLANK. This may
-				 * happen due to poor timing in this emulator. */
-				if((gb->hram_io[IO_STAT] & STAT_MODE) != IO_STAT_MODE_VBLANK)
-				{
-					gb->hram_io[IO_LCDC] |= LCDC_ENABLE;
-					return;
-				}
+				gb->lcd_blank = 1;
+			}
+			/* Check if LCD is being switched off. */
+			else if (lcd_enabled && !(val & LCDC_ENABLE))
+			{
+				/* Peanut-GB will happily turn off LCD outside
+				 * of VBLANK even though this damages real
+				 * hardware. */
 
 				/* Set LCD to Mode 0. */
-				gb->hram_io[IO_STAT] = (gb->hram_io[IO_STAT] & ~0x03);
-				/* Set to line 0. */
+				gb->hram_io[IO_STAT] =
+					(gb->hram_io[IO_STAT] & ~STAT_MODE) |
+					IO_STAT_MODE_HBLANK;
+				/* LY fixed to 0 when LCD turned off. */
 				gb->hram_io[IO_LY] = 0;
 				/* Reset LCD timer. */
 				gb->counter.lcd_count = 0;
 			}
-
 			return;
+		}
 
 		case 0x41:
 			gb->hram_io[IO_STAT] = (val & STAT_USER_BITS) | (gb->hram_io[IO_STAT] & STAT_MODE);
@@ -2377,22 +2401,31 @@ void __gb_step_cpu(struct gb_s *gb)
 				halt_cycles = tac_cycles;
 		}
 
-		if((gb->hram_io[IO_LCDC] & LCDC_ENABLE) != 0)
+		if((gb->hram_io[IO_LCDC] & LCDC_ENABLE))
 		{
 			int lcd_cycles;
 
-			if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM)
+			/* If LCD is in HBlank, calculate the number of cycles
+			 * until the end of HBlank and the start of mode 2 or
+			 * mode 1. */
+			if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK)
+			{
+				lcd_cycles = LCD_MODE_2_CYCLES -
+					     gb->counter.lcd_count;
+			}
+			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM)
 			{
 				lcd_cycles = LCD_MODE_3_CYCLES -
 					gb->counter.lcd_count;
 			}
-			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK)
+			else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_TRANSFER)
 			{
-				lcd_cycles = LCD_MODE_2_CYCLES -
+				lcd_cycles = LCD_MODE_0_CYCLES -
 					gb->counter.lcd_count;
 			}
 			else
 			{
+				/* VBlank */
 				lcd_cycles =
 					LCD_LINE_CYCLES - gb->counter.lcd_count;
 			}
@@ -3240,9 +3273,9 @@ void __gb_step_cpu(struct gb_s *gb)
 			}
 		}
 
-		/* TODO Check behaviour of LCD during LCD power off state. */
-		/* If LCD is off, don't update LCD state. */
-		if((gb->hram_io[IO_LCDC] & LCDC_ENABLE) == 0)
+		/* If LCD is off, don't update LCD state or increase the LCD
+		 * ticks. */
+		if(!(gb->hram_io[IO_LCDC] & LCDC_ENABLE))
 			continue;
 
 		/* LCD Timing */
@@ -3292,8 +3325,8 @@ void __gb_step_cpu(struct gb_s *gb)
 				 * updated. Also, only update lines on frames that are
 				 * actually drawn when frame skip is enabled. */
 				if(gb->direct.interlace &&
-					(!gb->direct.frame_skip ||
-						gb->display.frame_skip_count))
+						(!gb->direct.frame_skip ||
+						 gb->display.frame_skip_count))
 				{
 					gb->display.interlace_count =
 						!gb->display.interlace_count;
@@ -3323,7 +3356,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 		/* OAM access */
 		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_HBLANK &&
-			gb->counter.lcd_count >= LCD_MODE_2_CYCLES)
+				gb->counter.lcd_count >= LCD_MODE_2_CYCLES)
 		{
 			gb->hram_io[IO_STAT] =
 				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_OAM;
@@ -3337,7 +3370,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 		/* Update LCD */
 		else if((gb->hram_io[IO_STAT] & STAT_MODE) == IO_STAT_MODE_SEARCH_OAM &&
-			gb->counter.lcd_count >= LCD_MODE_3_CYCLES)
+				gb->counter.lcd_count >= LCD_MODE_3_CYCLES)
 		{
 			gb->hram_io[IO_STAT] =
 				(gb->hram_io[IO_STAT] & ~STAT_MODE) | IO_STAT_MODE_SEARCH_TRANSFER;
@@ -3346,8 +3379,8 @@ void __gb_step_cpu(struct gb_s *gb)
 				__gb_draw_line(gb);
 #endif
 			/* If halted immediately jump to next LCD mode. */
-			if (gb->counter.lcd_count < LCD_LINE_CYCLES)
-				inst_cycles = LCD_LINE_CYCLES - gb->counter.lcd_count;
+			if (gb->counter.lcd_count < LCD_MODE_0_CYCLES)
+				inst_cycles = LCD_MODE_0_CYCLES - gb->counter.lcd_count;
 		}
 	} while(gb->gb_halt && (gb->hram_io[IO_IF] & gb->hram_io[IO_IE]) == 0);
 	/* If halted, loop until an interrupt occurs. */
@@ -3372,6 +3405,11 @@ uint_fast32_t gb_get_save_size(struct gb_s *gb)
 		0x00, 0x800, 0x2000, 0x8000, 0x20000
 	};
 	uint8_t ram_size = gb->gb_rom_read(gb, ram_size_location);
+
+	/* MBC2 always has 512 half-bytes of cart RAM. */
+	if(gb->mbc == 2)
+		return 0x200;
+
 	return ram_sizes[ram_size];
 }
 
@@ -3503,7 +3541,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	};
 	const uint8_t cart_ram[] =
 	{
-		0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0,
+		0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0,
 		1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0
 	};
 	const uint16_t num_rom_banks_mask[] =
@@ -3549,6 +3587,10 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
 	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(gb, bank_count_location)] - 1;
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
+
+	/* Note that MBC2 will appear to have no RAM banks, but it actually
+	 * always has 512 half-bytes of RAM. Hence, gb->num_ram_banks must be
+	 * ignored for MBC2. */
 
 	gb->lcd_blank = 0;
 	gb->display.lcd_draw_line = NULL;
