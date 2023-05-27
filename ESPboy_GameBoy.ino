@@ -162,7 +162,8 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA54
 //#include "GAMES/rom_55.h" //Warioland (Super Marioland 3)
 //#define APP_MARKER 0xCA55
-
+//#include "GAMES/rom_56.h" //Final Fantasy Legend  (USA)
+//#define APP_MARKER 0xCA56 
 
 
 #define WRITE_DELAY 2000
