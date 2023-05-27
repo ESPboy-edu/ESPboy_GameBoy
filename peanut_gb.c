@@ -521,9 +521,9 @@ struct gb_s
 	/**
 	 * Notify front-end of error.
 	 *
-	 * \param gb_s			emulator context
+	 * \param gb_s		emulator context
 	 * \param gb_error_e	error code
-	 * \param addr			address of where error occurred
+	 * \param addr		address of where error occurred
 	 */
 	void (*gb_error)(struct gb_s*, const enum gb_error_e, const uint16_t addr);
 
@@ -536,10 +536,10 @@ struct gb_s
 
 	struct
 	{
-		unsigned gb_halt	: 1;
-		unsigned gb_ime		: 1;
-		unsigned gb_frame	: 1; /* New frame drawn. */
-		unsigned lcd_blank	: 1;
+		uint8_t gb_halt		: 1;
+		uint8_t gb_ime		: 1;
+		uint8_t gb_frame	: 1; /* New frame drawn. */
+		uint8_t lcd_blank	: 1;
 	};
 
 	/* Cartridge information:
@@ -614,8 +614,8 @@ struct gb_s
 		uint8_t WY;
 
 		/* Only support 30fps frame skip. */
-		unsigned frame_skip_count : 1;
-		unsigned interlace_count : 1;
+		uint8_t frame_skip_count : 1;
+		uint8_t interlace_count : 1;
 	} display;
 
 	/**
@@ -630,21 +630,21 @@ struct gb_s
 		/* Set to enable interlacing. Interlacing will start immediately
 		 * (at the next line drawing).
 		 */
-		unsigned interlace : 1;
-		unsigned frame_skip : 1;
+		uint8_t interlace : 1;
+		uint8_t frame_skip : 1;
 
 		union
 		{
 			struct
 			{
-				unsigned a	: 1;
-				unsigned b	: 1;
-				unsigned select	: 1;
-				unsigned start	: 1;
-				unsigned right	: 1;
-				unsigned left	: 1;
-				unsigned up	: 1;
-				unsigned down	: 1;
+				uint8_t a	: 1;
+				uint8_t b	: 1;
+				uint8_t select	: 1;
+				uint8_t start	: 1;
+				uint8_t right	: 1;
+				uint8_t left	: 1;
+				uint8_t up	: 1;
+				uint8_t down	: 1;
 			} joypad_bits;
 			uint8_t joypad;
 		};
@@ -728,11 +728,13 @@ uint8_t __gb_read(struct gb_s *gb, uint16_t addr)
 
 	case 0xA:
 	case 0xB:
-		if(gb->cart_ram && gb->enable_cart_ram)
+		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
-				return gb->cart_rtc[gb->cart_ram_bank - 0x08];
-			else if(gb->mbc == 2)
+			return gb->cart_rtc[gb->cart_ram_bank - 0x08];
+		}
+		else if(gb->cart_ram && gb->enable_cart_ram)
+		{
+			if(gb->mbc == 2)
 			{
 				/* Only 9 bits are available in address. */
 				addr &= 0x1FF;
@@ -892,12 +894,14 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 
 	case 0xA:
 	case 0xB:
-		/* Do not write to RAM if unavailable or disabled. */
-		if(gb->cart_ram && gb->enable_cart_ram)
+		if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
 		{
-			if(gb->mbc == 3 && gb->cart_ram_bank >= 0x08)
-				gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
-			else if(gb->mbc == 2)
+			gb->cart_rtc[gb->cart_ram_bank - 0x08] = val;
+		}
+		/* Do not write to RAM if unavailable or disabled. */
+		else if(gb->cart_ram && gb->enable_cart_ram)
+		{
+			if(gb->mbc == 2)
 			{
 				/* Only 9 bits are available in address. */
 				addr &= 0x1FF;
