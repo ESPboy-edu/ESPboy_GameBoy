@@ -32,6 +32,8 @@
 #ifndef PEANUT_GB_H
 #define PEANUT_GB_H
 
+#pragma GCC optimize ("-O3")
+
 #if defined(__has_include)
 # if __has_include("version.all")
 #  include "version.all"	/* Version information */
@@ -86,6 +88,12 @@
 /* Enable LCD drawing. On by default. May be turned off for testing purposes. */
 #ifndef ENABLE_LCD
 # define ENABLE_LCD 1
+#endif
+
+/* Enable 16 bit colour palette. If disabled, only four colour shades are set in
+ * pixel data. */
+#ifndef PEANUT_GB_12_COLOUR
+# define PEANUT_GB_12_COLOUR 1
 #endif
 
 /* Adds more code to improve LCD rendering accuracy. */
@@ -229,7 +237,8 @@
 #if !defined(PGB_UNREACHABLE)
 # if __has_builtin(__builtin_unreachable)
 #  define PGB_UNREACHABLE() __builtin_unreachable()
-# elif defined(_MSC_VER)
+# elif defined(_MSC_VER) && _MSC_VER >= 1200
+#  /* __assume is not available before VC6. */
 #  define PGB_UNREACHABLE() __assume(0)
 # else
 #  define PGB_UNREACHABLE() abort()
@@ -433,6 +442,8 @@ struct count_s
 #if ENABLE_LCD
 	/* Bit mask for the shade of pixel to display */
 	#define LCD_COLOUR	0x03
+
+# if PEANUT_GB_12_COLOUR
 	/**
 	* Bit mask for whether a pixel is OBJ0, OBJ1, or BG. Each may have a different
 	* palette when playing a DMG game on CGB.
@@ -447,6 +458,7 @@ struct count_s
 	* LCD_PALETTE_ALL == 0b11 --> NOT POSSIBLE
 	*/
 	#define LCD_PALETTE_ALL 0x30
+# endif
 #endif
 
 /**
@@ -977,7 +989,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			gb->hram_io[IO_JOYP] = val;
 
 			/* Direction keys selected */
-			if((gb->hram_io[IO_JOYP] & 0b010000) == 0)
+			if((gb->hram_io[IO_JOYP] & 0x10) == 0)
 				gb->hram_io[IO_JOYP] |= (gb->direct.joypad >> 4);
 			/* Button keys selected */
 			else
@@ -1013,7 +1025,7 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 
 		/* Interrupt Flag Register */
 		case 0x0F:
-			gb->hram_io[IO_IF] = (val | 0b11100000);
+			gb->hram_io[IO_IF] = (val | 0xE0);
 			return;
 
 		/* LCD Registers */
@@ -1070,10 +1082,13 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		/* DMA Register */
 		case 0x46:
 		{
-			uint16_t dma_addr = (uint_fast16_t)val << 8;
+			uint16_t dma_addr;
+			uint16_t i;
+
+			dma_addr = (uint_fast16_t)val << 8;
 			gb->hram_io[IO_DMA] = val;
 
-			for(uint16_t i = 0; i < OAM_SIZE; i++)
+			for(i = 0; i < OAM_SIZE; i++)
 			{
 				gb->oam[i] = __gb_read(gb, dma_addr + i);
 			}
@@ -1336,10 +1351,11 @@ struct sprite_data {
 static int compare_sprites(const void *in1, const void *in2)
 {
 	const struct sprite_data *sd1, *sd2;
+	int x_res;
 
 	sd1 = (struct sprite_data *)in1;
 	sd2 = (struct sprite_data *)in2;
-	int x_res = (int)sd1->x - (int)sd2->x;
+	x_res = (int)sd1->x - (int)sd2->x;
 	if(x_res != 0)
 		return x_res;
 
@@ -1380,35 +1396,36 @@ void __gb_draw_line(struct gb_s *gb)
 	/* If background is enabled, draw it. */
 	if(gb->hram_io[IO_LCDC] & LCDC_BG_ENABLE)
 	{
+		uint8_t bg_y, disp_x, bg_x, idx, py, px, t1, t2;
+		uint16_t bg_map, tile;
+
 		/* Calculate current background line to draw. Constant because
 		 * this function draws only this one line each time it is
 		 * called. */
-		const uint8_t bg_y = gb->hram_io[IO_LY] + gb->hram_io[IO_SCY];
+		bg_y = gb->hram_io[IO_LY] + gb->hram_io[IO_SCY];
 
 		/* Get selected background map address for first tile
 		 * corresponding to current line.
 		 * 0x20 (32) is the width of a background tile, and the bit
 		 * shift is to calculate the address. */
-		const uint16_t bg_map =
+		bg_map =
 			((gb->hram_io[IO_LCDC] & LCDC_BG_MAP) ?
 			 VRAM_BMAP_2 : VRAM_BMAP_1)
 			+ (bg_y >> 3) * 0x20;
 
 		/* The displays (what the player sees) X coordinate, drawn right
 		 * to left. */
-		uint8_t disp_x = LCD_WIDTH - 1;
+		disp_x = LCD_WIDTH - 1;
 
 		/* The X coordinate to begin drawing the background at. */
-		uint8_t bg_x = disp_x + gb->hram_io[IO_SCX];
+		bg_x = disp_x + gb->hram_io[IO_SCX];
 
 		/* Get tile index for current background tile. */
-		uint8_t idx = gb->vram[bg_map + (bg_x >> 3)];
+		idx = gb->vram[bg_map + (bg_x >> 3)];
 		/* Y coordinate of tile pixel to draw. */
-		const uint8_t py = (bg_y & 0x07);
+		py = (bg_y & 0x07);
 		/* X coordinate of tile pixel to draw. */
-		uint8_t px = 7 - (bg_x & 0x07);
-
-		uint16_t tile;
+		px = 7 - (bg_x & 0x07);
 
 		/* Select addressing mode. */
 		if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
@@ -1419,11 +1436,13 @@ void __gb_draw_line(struct gb_s *gb)
 		tile += 2 * py;
 
 		/* fetch first tile */
-		uint8_t t1 = gb->vram[tile] >> px;
-		uint8_t t2 = gb->vram[tile + 1] >> px;
+		t1 = gb->vram[tile] >> px;
+		t2 = gb->vram[tile + 1] >> px;
 
 		for(; disp_x != 0xFF; disp_x--)
 		{
+			uint8_t c;
+
 			if(px == 8)
 			{
 				/* fetch next tile */
@@ -1442,9 +1461,11 @@ void __gb_draw_line(struct gb_s *gb)
 			}
 
 			/* copy background */
-			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
+#if PEANUT_GB_12_COLOUR
 			pixels[disp_x] |= LCD_PALETTE_BG;
+#endif
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1456,20 +1477,21 @@ void __gb_draw_line(struct gb_s *gb)
 			&& gb->hram_io[IO_LY] >= gb->display.WY
 			&& gb->hram_io[IO_WX] <= 166)
 	{
+		uint16_t win_line, tile;
+		uint8_t disp_x, win_x, py, px, idx, t1, t2, end;
+
 		/* Calculate Window Map Address. */
-		uint16_t win_line = (gb->hram_io[IO_LCDC] & LCDC_WINDOW_MAP) ?
+		win_line = (gb->hram_io[IO_LCDC] & LCDC_WINDOW_MAP) ?
 				    VRAM_BMAP_2 : VRAM_BMAP_1;
 		win_line += (gb->display.window_clear >> 3) * 0x20;
 
-		uint8_t disp_x = LCD_WIDTH - 1;
-		uint8_t win_x = disp_x - gb->hram_io[IO_WX] + 7;
+		disp_x = LCD_WIDTH - 1;
+		win_x = disp_x - gb->hram_io[IO_WX] + 7;
 
 		// look up tile
-		uint8_t py = gb->display.window_clear & 0x07;
-		uint8_t px = 7 - (win_x & 0x07);
-		uint8_t idx = gb->vram[win_line + (win_x >> 3)];
-
-		uint16_t tile;
+		py = gb->display.window_clear & 0x07;
+		px = 7 - (win_x & 0x07);
+		idx = gb->vram[win_line + (win_x >> 3)];
 
 		if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
 			tile = VRAM_TILES_1 + idx * 0x10;
@@ -1479,14 +1501,16 @@ void __gb_draw_line(struct gb_s *gb)
 		tile += 2 * py;
 
 		// fetch first tile
-		uint8_t t1 = gb->vram[tile] >> px;
-		uint8_t t2 = gb->vram[tile + 1] >> px;
+		t1 = gb->vram[tile] >> px;
+		t2 = gb->vram[tile + 1] >> px;
 
 		// loop & copy window
-		uint8_t end = (gb->hram_io[IO_WX] < 7 ? 0 : gb->hram_io[IO_WX] - 7) - 1;
+		end = (gb->hram_io[IO_WX] < 7 ? 0 : gb->hram_io[IO_WX] - 7) - 1;
 
 		for(; disp_x != end; disp_x--)
 		{
+			uint8_t c;
+
 			if(px == 8)
 			{
 				// fetch next tile
@@ -1505,9 +1529,11 @@ void __gb_draw_line(struct gb_s *gb)
 			}
 
 			// copy window
-			uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
+			c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 			pixels[disp_x] = gb->display.bg_palette[c];
+#if PEANUT_GB_12_COLOUR
 			pixels[disp_x] |= LCD_PALETTE_BG;
+#endif
 			t1 = t1 >> 1;
 			t2 = t2 >> 1;
 			px++;
@@ -1519,14 +1545,16 @@ void __gb_draw_line(struct gb_s *gb)
 	// draw sprites
 	if(gb->hram_io[IO_LCDC] & LCDC_OBJ_ENABLE)
 	{
+		uint8_t sprite_number;
 #if PEANUT_GB_HIGH_LCD_ACCURACY
 		uint8_t number_of_sprites = 0;
+
 		struct sprite_data sprites_to_render[NUM_SPRITES];
 
 		/* Record number of sprites on the line being rendered, limited
 		 * to the maximum number sprites that the Game Boy is able to
 		 * render on each line (10 sprites). */
-		for(uint8_t sprite_number = 0;
+		for(sprite_number = 0;
 				sprite_number < PEANUT_GB_ARRAYSIZE(sprites_to_render);
 				sprite_number++)
 		{
@@ -1558,18 +1586,19 @@ void __gb_draw_line(struct gb_s *gb)
 		/* Render each sprite, from low priority to high priority. */
 #if PEANUT_GB_HIGH_LCD_ACCURACY
 		/* Render the top ten prioritised sprites on this scanline. */
-		for(uint8_t sprite_number = number_of_sprites - 1;
+		for(sprite_number = number_of_sprites - 1;
 				sprite_number != 0xFF;
 				sprite_number--)
 		{
 			uint8_t s = sprites_to_render[sprite_number].sprite_number;
 #else
-		for (uint8_t sprite_number = NUM_SPRITES - 1;
+		for (sprite_number = NUM_SPRITES - 1;
 			sprite_number != 0xFF;
 			sprite_number--)
 		{
 			uint8_t s = sprite_number;
 #endif
+			uint8_t py, t1, t2, dir, start, end, shift, disp_x;
 			/* Sprite Y position. */
 			uint8_t OY = gb->oam[4 * s + 0];
 			/* Sprite X position. */
@@ -1593,18 +1622,16 @@ void __gb_draw_line(struct gb_s *gb)
 				continue;
 
 			// y flip
-			uint8_t py = gb->hram_io[IO_LY] - OY + 16;
+			py = gb->hram_io[IO_LY] - OY + 16;
 
 			if(OF & OBJ_FLIP_Y)
 				py = (gb->hram_io[IO_LCDC] & LCDC_OBJ_SIZE ? 15 : 7) - py;
 
 			// fetch the tile
-			uint8_t t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py];
-			uint8_t t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py + 1];
+			t1 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py];
+			t2 = gb->vram[VRAM_TILES_1 + OT * 0x10 + 2 * py + 1];
 
 			// handle x flip
-			uint8_t dir, start, end, shift;
-
 			if(OF & OBJ_FLIP_X)
 			{
 				dir = 1;
@@ -1614,7 +1641,7 @@ void __gb_draw_line(struct gb_s *gb)
 			}
 			else
 			{
-				dir = -1;
+				dir = (uint8_t)-1;
 				start = MIN(OX, LCD_WIDTH) - 1;
 				end = (OX < 8 ? 0 : OX - 8) - 1;
 				shift = OX - (start + 1);
@@ -1627,7 +1654,7 @@ void __gb_draw_line(struct gb_s *gb)
 			/* TODO: Put for loop within the to if statements
 			 * because the BG priority bit will be the same for
 			 * all the pixels in the tile. */
-			for(uint8_t disp_x = start; disp_x != end; disp_x += dir)
+			for(disp_x = start; disp_x != end; disp_x += dir)
 			{
 				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 				// check transparency / sprite overlap / background overlap
@@ -1638,8 +1665,10 @@ void __gb_draw_line(struct gb_s *gb)
 					pixels[disp_x] = (OF & OBJ_PALETTE)
 						? gb->display.sp_palette[c + 4]
 						: gb->display.sp_palette[c];
+#if PEANUT_GB_12_COLOUR
 					/* Set pixel palette (OBJ0 or OBJ1). */
 					pixels[disp_x] |= (OF & OBJ_PALETTE);
+#endif
 				}
 
 				t1 = t1 >> 1;
@@ -2000,7 +2029,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 	}
 
-	case 0x28: /* JP Z, imm */
+	case 0x28: /* JR Z, imm */
 		if(gb->cpu_reg.f_bits.z)
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc.reg++);
@@ -2050,7 +2079,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		gb->cpu_reg.f_bits.h = 1;
 		break;
 
-	case 0x30: /* JP NC, imm */
+	case 0x30: /* JR NC, imm */
 		if(!gb->cpu_reg.f_bits.c)
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc.reg++);
@@ -2106,7 +2135,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		gb->cpu_reg.f_bits.c = 1;
 		break;
 
-	case 0x38: /* JP C, imm */
+	case 0x38: /* JR C, imm */
 		if(gb->cpu_reg.f_bits.c)
 		{
 			int8_t temp = (int8_t) __gb_read(gb, gb->cpu_reg.pc.reg++);
@@ -3432,8 +3461,9 @@ uint8_t gb_colour_hash(struct gb_s *gb)
 #define ROM_TITLE_END_ADDR	0x0143
 
 	uint8_t x = 0;
+	uint16_t i;
 
-	for(uint16_t i = ROM_TITLE_START_ADDR; i <= ROM_TITLE_END_ADDR; i++)
+	for(i = ROM_TITLE_START_ADDR; i <= ROM_TITLE_END_ADDR; i++)
 		x += gb->gb_rom_read(gb, i);
 
 	return x;
@@ -3571,8 +3601,9 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	/* Check valid ROM using checksum value. */
 	{
 		uint8_t x = 0;
+		uint16_t i;
 
-		for(uint16_t i = 0x0134; i <= 0x014C; i++)
+		for(i = 0x0134; i <= 0x014C; i++)
 			x = x - gb->gb_rom_read(gb, i) - 1;
 
 		if(x != gb->gb_rom_read(gb, ROM_HEADER_CHECKSUM_LOC))

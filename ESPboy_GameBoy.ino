@@ -156,7 +156,7 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA51
 //#include "GAMES/rom_52.h" //Space Invaders (U) [S][!]
 //#define APP_MARKER 0xCA52
-//#include "GAMES/rom_53.h" Worms (Europe)
+//#include "GAMES/rom_53.h" //Worms (Europe)
 //#define APP_MARKER 0xCA53
 //#include "GAMES/rom_54.h" //harvest_moon(USA)
 //#define APP_MARKER 0xCA54
@@ -431,7 +431,7 @@ void setup() {
   //Serial.println();
   //Serial.println(ESP.getFreeHeap());
 
-  myESPboy.begin("GameBoy emu 2.5");
+  myESPboy.begin("GameBoy emu 2.6");
 
 //Check OTA2
 //  if (myESPboy.getKeys()&PAD_ACT || myESPboy.getKeys()&PAD_ESC) { 
@@ -485,7 +485,7 @@ void setup() {
     gb->direct.interlace = 0;
     gb->direct.frame_skip = 1;
   
-  sigmaDeltaSetup(0, 300000);
+  sigmaDeltaSetup(0, SAMPLING_RATE);
   sigmaDeltaAttachPin(SOUNDPIN);
   sigmaDeltaEnable();
   noInterrupts();
