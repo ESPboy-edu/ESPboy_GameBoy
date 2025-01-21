@@ -60,8 +60,8 @@ ESPboyInit myESPboy;
 
 //#include "GAMES/rom_1.h"  //test rom
 //#define APP_MARKER 0xCA01
-//#include "GAMES/rom_2.h"  //super mario land
-//#define APP_MARKER 0xCA02
+#include "GAMES/rom_2.h"  //super mario land
+#define APP_MARKER 0xCA02
 //#include "GAMES/rom_3.h"  //tetris
 //#define APP_MARKER 0xCA03
 //#include "GAMES/rom_4.h"  //lemmings
@@ -164,8 +164,8 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA55
 //#include "GAMES/rom_56.h" //Final Fantasy Legend  (USA)
 //#define APP_MARKER 0xCA56 
-#include "GAMES/rom_57.h" //Kwirk (UE)
-#define APP_MARKER 0xCA57
+//#include "GAMES/rom_57.h" //Kwirk (UE)
+//#define APP_MARKER 0xCA57
 
 
 #define WRITE_DELAY 2000
