@@ -12,7 +12,7 @@ https://hackaday.io/project/164830-espboy-games-iot-stem-for-education-funhttps:
 MIT license
 */
 
-#pragma GCC optimize ("-O3")
+#pragma GCC optimize ("-O2")
 #pragma GCC push_options
 
 #include "Arduino.h"
@@ -36,6 +36,9 @@ ESPboyInit myESPboy;
 //ESPboyTerminalGUI *terminalGUIobj = NULL;
 //ESPboyOTA2 *OTA2obj = NULL;
 
+int32_t maxout = 0;
+int32_t minch1 = 0, minch2 = 0, minch3 = 0, minch4 = 0;
+uint32_t divider = 64;
 
 //------------------------------------sprite_1-----------------------------------------------------------sprite_2-------------------------------------------------------------background----------
 //  const uint16_t palette0[] = { 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; // PeanutGB
@@ -60,8 +63,8 @@ ESPboyInit myESPboy;
 
 //#include "GAMES/rom_1.h"  //test rom
 //#define APP_MARKER 0xCA01
-#include "GAMES/rom_2.h"  //super mario land
-#define APP_MARKER 0xCA02
+//#include "GAMES/rom_2.h"  //super mario land
+//#define APP_MARKER 0xCA02
 //#include "GAMES/rom_3.h"  //tetris
 //#define APP_MARKER 0xCA03
 //#include "GAMES/rom_4.h"  //lemmings
@@ -74,8 +77,8 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA07
 //#include "GAMES/rom_8.h"  //prince of persia
 //#define APP_MARKER 0xCA08
-//#include "GAMES/rom_9.h"  //contra
-//#define APP_MARKER 0xCA09
+#include "GAMES/rom_9.h"  //contra
+#define APP_MARKER 0xCA09
 //#include "GAMES/rom_10.h" //Felix the cat
 //#define APP_MARKER 0xCA10
 //#include "GAMES/rom_11.h" //Pokemon
@@ -179,10 +182,6 @@ uint8_t  previousSoundFlag;
 uint8_t  paletteAndOffsetChangeFlag = 0;
 uint32_t timeToSave;
 bool     cartSaveFlag = 0;
-
-int32_t maxout=0;
-int32_t minch1=0, minch2=0, minch3=0, minch4=0;
-uint32_t divider=64;
 
 struct SaveStruct{
   uint32_t appMarker = APP_MARKER;
@@ -334,69 +333,105 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
   uint8_t *pix;
   
 
-void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, uint_fast8_t line){
+void IRAM_ATTR lcd_draw_line(struct gb_s *gb, const uint8_t *pixels, uint_fast8_t line) {
   if (paletteAndOffsetChangeFlag) {
      paletteNN = (uint16_t *)paletteN[realSaveStruct.paletteNo];
      offset_xx = realSaveStruct.offset_x;
      offset_yy = realSaveStruct.offset_y;
-   }
+  }
 
-  if(!realSaveStruct.forceRescale){
-    if (line < offset_yy || line > offset_yy+127) return;}
-  else{
-    if (!(line%8)) {memcpy(uiBuff3, pixels, 160); skippedLineFlag = 1; return;}
-    line -= line>>3;}
+  if (!realSaveStruct.forceRescale) {
+    if (line < offset_yy || line > offset_yy + 127) return;
+  } else {
+    if (!(line % 8)) { 
+      memcpy(uiBuff3, pixels, 160); 
+      skippedLineFlag = 1; 
+      return; 
+    }
+    line -= line >> 3;
+  }
   
-  if(line != prevLine+1){
-    while(nbSPI_isBusy());
-    if (!realSaveStruct.forceRescale) myESPboy.tft.setAddrWindow(0, line-offset_yy, 128, 128);
-    else  myESPboy.tft.setAddrWindow(0, line, 128, 128);}
+  if (line != prevLine + 1) {
+    while (nbSPI_isBusy());
+    if (!realSaveStruct.forceRescale) 
+      myESPboy.tft.setAddrWindow(0, line - offset_yy, 128, 128);
+    else  
+      myESPboy.tft.setAddrWindow(0, line, 128, 128);
+  }
 
-    currentBuf = flipBuf?uiBuff1:uiBuff2;
-    currentBuf2 = currentBuf;
-    currentBuf3 = &currentBuf[128];
+  currentBuf = flipBuf ? uiBuff1 : uiBuff2;
+  currentBuf2 = currentBuf;
+  currentBuf3 = &currentBuf[128];
 
-    if (!realSaveStruct.forceRescale) pix = (uint8_t *)&pixels[offset_xx];
-    else pix = (uint8_t *)&pixels[0];
+  if (!realSaveStruct.forceRescale) 
+    pix = (uint8_t *)&pixels[offset_xx];
+  else 
+    pix = (uint8_t *)&pixels[0];
 
-  if(skippedLineFlag){
-    skippedLineFlag=0;  
+  // Выносим ветвление if(!realSaveStruct.forceRescale) за пределы цикла
+  if (skippedLineFlag) {
+    skippedLineFlag = 0;  
     uint8_t *pixx = &uiBuff3[0];
-    while (currentBuf != currentBuf3){  
-      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
-      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
-      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
-      if(!realSaveStruct.forceRescale) {*currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;}
-      else {*currentBuf++ = paletteNN[(pix[0]+pix[1]+pixx[0]+pixx[1])>>2]; pix+= 2; pixx+= 2;}
-      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
-      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
-      *currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;
-      if(!realSaveStruct.forceRescale) {*currentBuf++ = paletteNN[((*pix)+(*pixx))>>1]; pix++; pixx++;}
-      else {*currentBuf++ = paletteNN[(pix[0]+pix[1]+pixx[0]+pixx[1])>>2]; pix+= 2; pixx+= 2;}
+    
+    if (!realSaveStruct.forceRescale) {
+      // Быстрый цикл без масштабирования
+      while (currentBuf != currentBuf3) {  
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+      }
+    } else {
+      // Быстрый цикл с масштабированием
+      while (currentBuf != currentBuf3) {  
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[(pix[0] + pix[1] + pixx[0] + pixx[1]) >> 2]; pix += 2; pixx += 2;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[((*pix) + (*pixx)) >> 1]; pix++; pixx++;
+        *currentBuf++ = paletteNN[(pix[0] + pix[1] + pixx[0] + pixx[1]) >> 2]; pix += 2; pixx += 2;
+      }
     }
-  }
-  else{      
-    while (currentBuf != currentBuf3){
-      *currentBuf++ = paletteNN[(*pix++)];
-      *currentBuf++ = paletteNN[(*pix++)];
-      *currentBuf++ = paletteNN[(*pix++)];
-      if(!realSaveStruct.forceRescale) *currentBuf++ = paletteNN[(*pix++)];
-      else {*currentBuf++ = paletteNN[(pix[0]+pix[1])>>1]; pix+= 2;}
-      *currentBuf++ = paletteNN[(*pix++)];
-      *currentBuf++ = paletteNN[(*pix++)];
-      *currentBuf++ = paletteNN[(*pix++)];
-      if(!realSaveStruct.forceRescale) *currentBuf++ = paletteNN[(*pix++)];
-      else {*currentBuf++ = paletteNN[(pix[0]+pix[1])>>1]; pix+= 2;}
+  } else {      
+    if (!realSaveStruct.forceRescale) {
+      // Базовый цикл без масштабирования
+      while (currentBuf != currentBuf3) {
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+      }
+    } else {
+      // Базовый цикл с масштабированием
+      while (currentBuf != currentBuf3) {
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(pix[0] + pix[1]) >> 1]; pix += 2;
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(*pix++)];
+        *currentBuf++ = paletteNN[(pix[0] + pix[1]) >> 1]; pix += 2;
+      }
     }
   }
 
-    while(nbSPI_isBusy()); nbSPI_writeBytes((uint8_t*)currentBuf2, 256);   //unsafe but fast render method
-    //myESPboy.tft.pushColors(currentBuf2, 128, false); //safe but slow render method 
+  while (nbSPI_isBusy()); 
+  nbSPI_writeBytes((uint8_t*)currentBuf2, 256);   // unsafe but fast render method
 
-    prevLine = line;
-    flipBuf = !flipBuf;
+  prevLine = line;
+  flipBuf = !flipBuf;
 }
-
 
 
 void IRAM_ATTR sound_ISR(){
@@ -433,7 +468,7 @@ void setup() {
   //Serial.println();
   //Serial.println(ESP.getFreeHeap());
 
-  myESPboy.begin("GameBoy emu 2.7");
+  myESPboy.begin("GameBoy emu 3.0");
 
 //Check OTA2
 //  if (myESPboy.getKeys()&PAD_ACT || myESPboy.getKeys()&PAD_ESC) { 
@@ -506,15 +541,10 @@ void setup() {
 
 #define FRAME_TIME 12000
 uint32_t nextScreen;
-uint8_t passGetkey;
 
 void loop() {   
-   if(passGetkey > 4){
-      readkeys();
-      divider = (maxout>>8)+1;
-      passGetkey=0;}
-   passGetkey++;
-   
+   readkeys();
+   divider = (maxout >> 8) + 1;
    gb_run_frame(gb);
  
   if (cartSaveFlag && millis() - timeToSave > WRITE_DELAY){
@@ -525,6 +555,6 @@ void loop() {
     cartSaveFlag = 0;
   }
 
-  while(nextScreen > micros());
+  while(nextScreen > micros()) yield();
   nextScreen = micros() + FRAME_TIME ;
 };
