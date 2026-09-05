@@ -70,4 +70,13 @@ void ESPboyInit::playTone(uint16_t frq) { tone(SOUNDPIN, frq); }
 
 void ESPboyInit::noPlayTone() { noTone(SOUNDPIN); }
 
-uint8_t ESPboyInit::getKeys() { return (~mcp.readGPIOAB() & 255); }
+uint8_t ESPboyInit::getKeys() { 
+  static uint32_t lastReadMillis = 0;
+  static uint8_t cachedKeys = 0;
+  if (millis() - lastReadMillis >= 20) { 
+    cachedKeys = (~mcp.readGPIOAB() & 255);
+    lastReadMillis = millis();
+  }
+  return cachedKeys; 
+}
+

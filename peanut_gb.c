@@ -29,6 +29,9 @@
  * is Copyright (c) 2015-2019 Lior Halphon.
  */
 
+
+#include <Arduino.h>
+
 #ifndef PEANUT_GB_H
 #define PEANUT_GB_H
 

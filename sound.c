@@ -1,6 +1,6 @@
 /* Audio Support */
-
-#pragma GCC optimize ("-O3")
+#include "Arduino.h"
+#pragma GCC optimize ("-O2")
 
 #include "sound.h"
 
@@ -503,125 +503,51 @@ s16 GENERATE_NOISE(u8 vol, u8 tone)
 
 
 
-    extern int32_t maxout;
-    extern uint8_t divider;
-    extern int32_t minch1, minch2, minch3, minch4;
+
     int32_t ch;
     
 /*
     Handle audio logic and generate sound at 256hz
 */
-u8 audio_update()
-    {
-    /*
-        Audio buffer housekeeping.
-    */
-    int32_t out=0;
 
-    // check APU power
-    if (SO.power) 
-        {
-    /*
-        Channel logic and sound generation.
-    */
+u8 IRAM_ATTR audio_update() {
+    int32_t out = 0;
 
-    // Channel 1
+    if (SO.power) {
+        // Канал 1
+        CHANNEL_UPDATE(&CH1.channel, 1, 64 - CH1.duty_len.len, audio_cycle);
+        SWEEP_UPDATE(&CH1.channel, &CH1.sweep, audio_cycle);
+        ENVELOPE_UPDATE(&CH1.envelope, audio_cycle);
+        out += GENERATE_WAVE(CH1.channel.freq, CH1.envelope.volume, CH1.duty_len.duty);
 
-    CHANNEL_UPDATE(
-        &CH1.channel, 1,
-        64 - CH2.duty_len.len,
-        audio_cycle
-    );
+        // Канал 2
+        CHANNEL_UPDATE(&CH2.channel, 2, 64 - CH2.duty_len.len, audio_cycle);
+        ENVELOPE_UPDATE(&CH2.envelope, audio_cycle);
+        out += GENERATE_WAVE(CH2.channel.freq, CH2.envelope.volume, CH2.duty_len.duty);
 
-    //if (CH1.channel.enable && 1)
-    //    {
-        SWEEP_UPDATE(
-            &CH1.channel,
-            &CH1.sweep,
-            audio_cycle
-        );
+        // Канал 3
+        CHANNEL_UPDATE(&CH3.channel, 3, 64 - CH3.sound_len, audio_cycle);
+        out += GENERATE_CH3(CH3.channel.freq, CH3.out_level);
 
-        ENVELOPE_UPDATE(
-            &CH1.envelope,
-            audio_cycle
-        );
-
-        ch=GENERATE_WAVE(
-            CH1.channel.freq,
-            CH1.envelope.volume,
-            CH1.duty_len.duty
-        );
-        if(ch<minch1)minch1=ch;
-        out+=ch-minch1;
-      //  }
-
-    // Channel 2
-
-    CHANNEL_UPDATE(
-        &CH2.channel, 2,
-        64 - CH2.duty_len.len,
-        audio_cycle
-    );
-
-    //if (CH2.channel.enable && 1)
-    //    {
-        ENVELOPE_UPDATE(
-            &CH2.envelope,
-            audio_cycle
-        );
-
-        ch=GENERATE_WAVE(
-            CH2.channel.freq,
-            CH2.envelope.volume,
-            CH2.duty_len.duty
-        );
-        if(ch<minch2)minch2=ch;
-        out+=ch-minch2;      
-      //  }
-
-
-    // Channel 3
-
-    CHANNEL_UPDATE(
-        &CH3.channel, 3,
-        64 - CH3.sound_len,
-        audio_cycle);
-
-    //if (CH3.channel.enable && 1)
-    //    {
-        ch=GENERATE_CH3(CH3.channel.freq, CH3.out_level);
-        if(ch<minch3)minch3=ch;
-        out+=ch-minch3;
-    //    }
-
-
-    // Channel 4
-
-    CHANNEL_UPDATE(
-        &CH4.channel, 4,
-        64 - CH4.len.len,
-        audio_cycle
-        );
-
-    //if (CH4.channel.enable && 1)
-    //    {
-        ENVELOPE_UPDATE(
-            &CH4.envelope,
-            audio_cycle
-        );
-    //out+=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS));
-    ch=(GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS))>>1;//make noise silent dev by 2
-    if(ch<minch3)minch3=ch;
-    out+=ch-minch3;
-     //   }
-    
-        }
-
-++audio_cycle;
-++sample_count;
-
-    if (out>maxout)maxout=out;
-
-    out = out/divider;
-    return (out);
+        // Канал 4
+        CHANNEL_UPDATE(&CH4.channel, 4, 64 - CH4.len.len, audio_cycle);
+        ENVELOPE_UPDATE(&CH4.envelope, audio_cycle);
+        out += (GENERATE_NOISE(CH4.envelope.volume, CH4.NR43 & NR43_DIV_RATIO_BITS)) >> 1;
     }
+
+    ++audio_cycle;
+    ++sample_count;
+
+    // Масштабируем сумму каналов (делим на 16)
+    // Диапазон от ~ -1920 до +1920 превращается в ~ -120 до +120
+    out = out >> 4; 
+
+    // Центрируем волну ровно на 128 (идеальная тишина для 8-битного ЦАП)
+    out += 128;
+
+    // Жесткое ограничение для защиты от аппаратного переполнения sigmadelta
+    if (out > 255) out = 255;
+    if (out < 0) out = 0;
+
+    return (u8)out;
+}

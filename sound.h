@@ -14,7 +14,7 @@ typedef unsigned int u32;
 //#define TRIANGLE_WAVE
 
 // Platform sound configuration
-#define SAMPLING_RATE		32000
+#define SAMPLING_RATE		16000
 //#define SAMPLING_SIZE		1024
 //#define AUDIO_CHANNELS 		2
 
