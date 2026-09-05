@@ -27,7 +27,7 @@ MIT license
 
 #include <ESP_EEPROM.h>
 #include "sound.h"
-#include "peanut_gb.c"
+#include "peanut_gb.h"
 #include "LittleFS.h"
 #include "nbSPI.h"
 #include <sigma_delta.h>
@@ -35,6 +35,7 @@ MIT license
 ESPboyInit myESPboy;
 //ESPboyTerminalGUI *terminalGUIobj = NULL;
 //ESPboyOTA2 *OTA2obj = NULL;
+
 
 //------------------------------------sprite_1-----------------------------------------------------------sprite_2-------------------------------------------------------------background----------
 //  const uint16_t palette0[] = { 0x79DF, 0x2D7E, 0x6D2B, 0x6308, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x7FFF, 0x3FE6, 0x0200, 0x0000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x6ACE, 0x279D, 0xE46B, 0x613A }; // PeanutGB
@@ -59,8 +60,8 @@ ESPboyInit myESPboy;
 
 //#include "GAMES/rom_1.h"  //test rom
 //#define APP_MARKER 0xCA01
-//#include "GAMES/rom_2.h"  //super mario land
-//#define APP_MARKER 0xCA02
+#include "GAMES/rom_2.h"  //super mario land
+#define APP_MARKER 0xCA02
 //#include "GAMES/rom_3.h"  //tetris
 //#define APP_MARKER 0xCA03
 //#include "GAMES/rom_4.h"  //lemmings
@@ -73,8 +74,8 @@ ESPboyInit myESPboy;
 //#define APP_MARKER 0xCA07
 //#include "GAMES/rom_8.h"  //prince of persia
 //#define APP_MARKER 0xCA08
-#include "GAMES/rom_9.h"  //contra
-#define APP_MARKER 0xCA09
+//#include "GAMES/rom_9.h"  //contra
+//#define APP_MARKER 0xCA09
 //#include "GAMES/rom_10.h" //Felix the cat
 //#define APP_MARKER 0xCA10
 //#include "GAMES/rom_11.h" //Pokemon
