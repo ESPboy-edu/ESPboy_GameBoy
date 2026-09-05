@@ -29,9 +29,6 @@
  * is Copyright (c) 2015-2019 Lior Halphon.
  */
 
-
-#include <Arduino.h>
-
 #ifndef PEANUT_GB_H
 #define PEANUT_GB_H
 
@@ -44,7 +41,7 @@
 # define __has_include(x) 0
 #endif
 
-#include <stdlib.h>	/* Required for qsort and abort */
+#include <stdlib.h>	/* Required for abort */
 #include <stdbool.h>	/* Required for bool types */
 #include <stdint.h>	/* Required for int types */
 #include <string.h>	/* Required for memset */
@@ -199,6 +196,7 @@
 #define LCD_MODE3_LCD_DRAW_MIN_DURATION	172
 #define LCD_MODE3_LCD_DRAW_MAX_DURATION	289
 #define LCD_MODE1_VBLANK_DURATION	(LCD_LINE_CYCLES * (LCD_VERT_LINES - LCD_HEIGHT))
+#define LCD_FRAME_CYCLES		(LCD_LINE_CYCLES * LCD_VERT_LINES)
 /* The following assumes that Hblank starts on cycle 0. */
 /* Mode 2 (OAM Scan) starts on cycle 204 (although this is dependent on the
  * duration of Mode 3 (LCD Draw). */
@@ -495,6 +493,7 @@ struct count_s
 	uint_fast16_t tima_count;	/* Timer Counter */
 	uint_fast16_t serial_count;	/* Serial Counter */
 	uint_fast32_t rtc_count;	/* RTC Counter */
+	uint_fast32_t lcd_off_count;	/* Cycles LCD has been disabled */
 };
 
 #if ENABLE_LCD
@@ -626,8 +625,14 @@ struct gb_s
 	{
 		bool gb_halt	: 1;
 		bool gb_ime	: 1;
-		bool gb_frame	: 1; /* New frame drawn. */
+		/* gb_frame is set when 0.016742706298828125 seconds have
+		 * passed. It is likely that a new frame has been drawn since
+		 * then, but it is possible that the LCD was switched off and
+		 * nothing was drawn. */
+		bool gb_frame	: 1;
 		bool lcd_blank	: 1;
+		/* Set if MBC3O cart is used. */
+		bool cart_is_mbc3O : 1;
 	};
 
 	/* Cartridge information:
@@ -892,17 +897,19 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 	case 0x0:
 	case 0x1:
 		/* Set RAM enable bit. MBC2 is handled in fall-through. */
-		if(gb->mbc > 0 && gb->mbc != 2 && gb->cart_ram)
+		if (gb->mbc > 0 && gb->mbc != 2)
 		{
-			gb->enable_cart_ram = ((val & 0x0F) == 0x0A);
+			if (gb->cart_ram)
+				gb->enable_cart_ram = ((val & 0x0F) == 0x0A);
 			return;
 		}
 
-	/* Intentional fall through. */
+		/* Intentional fall through. */
 	case 0x2:
-		if(gb->mbc == 5)
+		if (gb->mbc == 5)
 		{
-			gb->selected_rom_bank = (gb->selected_rom_bank & 0x100) | val;
+			gb->selected_rom_bank =
+				(gb->selected_rom_bank & 0x100) | val;
 			gb->selected_rom_bank =
 				gb->selected_rom_bank & gb->num_rom_banks_mask;
 			return;
@@ -937,7 +944,9 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 		}
 		else if(gb->mbc == 3)
 		{
-			gb->selected_rom_bank = val & 0x7F;
+			gb->selected_rom_bank = val;
+			if(!gb->cart_is_mbc3O)
+				gb->selected_rom_bank = val & 0x7F;
 
 			if(!gb->selected_rom_bank)
 				gb->selected_rom_bank++;
@@ -957,7 +966,15 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			gb->selected_rom_bank = gb->selected_rom_bank & gb->num_rom_banks_mask;
 		}
 		else if(gb->mbc == 3)
+		{
 			gb->cart_ram_bank = val;
+			/* If not using MBC3, only the first 4 cart RAM banks are useable.
+			 * If cart RAM bank 0x8-0xC are selected, then the corresponding
+			 * RTC register is selected instead of cart RAM. */
+			if(!gb->cart_is_mbc3O && gb->cart_ram_bank < 0x8)
+				gb->cart_ram_bank &= 0x3;
+		}
+
 		else if(gb->mbc == 5)
 			gb->cart_ram_bank = (val & 0x0F);
 
@@ -1141,7 +1158,11 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 					IO_STAT_MODE_HBLANK;
 				/* LY fixed to 0 when LCD turned off. */
 				gb->hram_io[IO_LY] = 0;
-				/* Reset LCD timer. */
+				/* Keep track of lcd_count to correctly track
+				 * passing time. */
+				gb->counter.lcd_off_count += gb->counter.lcd_count;
+				/* Reset LCD timer, since the LCD starts from
+				 * the beginning on power on. */
 				gb->counter.lcd_count = 0;
 			}
 			return;
@@ -1425,13 +1446,10 @@ struct sprite_data {
 };
 
 #if PEANUT_GB_HIGH_LCD_ACCURACY
-static int compare_sprites(const void *in1, const void *in2)
+static int compare_sprites(const struct sprite_data *const sd1, const struct sprite_data *const sd2)
 {
-	const struct sprite_data *sd1, *sd2;
 	int x_res;
 
-	sd1 = (struct sprite_data *)in1;
-	sd2 = (struct sprite_data *)in2;
 	x_res = (int)sd1->x - (int)sd2->x;
 	if(x_res != 0)
 		return x_res;
@@ -1626,13 +1644,13 @@ void __gb_draw_line(struct gb_s *gb)
 #if PEANUT_GB_HIGH_LCD_ACCURACY
 		uint8_t number_of_sprites = 0;
 
-		struct sprite_data sprites_to_render[NUM_SPRITES];
+		struct sprite_data sprites_to_render[MAX_SPRITES_LINE];
 
 		/* Record number of sprites on the line being rendered, limited
 		 * to the maximum number sprites that the Game Boy is able to
 		 * render on each line (10 sprites). */
 		for(sprite_number = 0;
-				sprite_number < PEANUT_GB_ARRAYSIZE(sprites_to_render);
+				sprite_number < NUM_SPRITES;
 				sprite_number++)
 		{
 			/* Sprite Y position. */
@@ -1646,18 +1664,26 @@ void __gb_draw_line(struct gb_s *gb)
 					|| gb->hram_io[IO_LY] + 16 < OY)
 				continue;
 
+			struct sprite_data current;
 
-			sprites_to_render[number_of_sprites].sprite_number = sprite_number;
-			sprites_to_render[number_of_sprites].x = OX;
-			number_of_sprites++;
+			current.sprite_number = sprite_number;
+			current.x = OX;
+
+			uint8_t place;
+			for (place = number_of_sprites; place != 0; place--)
+			{
+				if(compare_sprites(&sprites_to_render[place - 1], &current) < 0)
+					break;
+			}
+			if(place >= MAX_SPRITES_LINE)
+				continue;
+			for (uint8_t i = number_of_sprites; i > place; --i) {
+				sprites_to_render[i] = sprites_to_render[i - 1];
+			}
+			if(number_of_sprites < MAX_SPRITES_LINE)
+				number_of_sprites++;
+			sprites_to_render[place] = current;
 		}
-
-		/* If maximum number of sprites reached, prioritise X
-		 * coordinate and object location in OAM. */
-		qsort(&sprites_to_render[0], number_of_sprites,
-				sizeof(sprites_to_render[0]), compare_sprites);
-		if(number_of_sprites > MAX_SPRITES_LINE)
-			number_of_sprites = MAX_SPRITES_LINE;
 #endif
 
 		/* Render each sprite, from low priority to high priority. */
@@ -3375,9 +3401,18 @@ void __gb_step_cpu(struct gb_s *gb)
 		}
 
 		/* If LCD is off, don't update LCD state or increase the LCD
-		 * ticks. */
+		 * ticks. Instead, keep track of the amount of time that is
+		 * being passed. */
 		if(!(gb->hram_io[IO_LCDC] & LCDC_ENABLE))
+		{
+			gb->counter.lcd_off_count += inst_cycles;
+			if(gb->counter.lcd_off_count >= LCD_FRAME_CYCLES)
+			{
+				gb->counter.lcd_off_count -= LCD_FRAME_CYCLES;
+				gb->gb_frame = true;
+			}
 			continue;
+		}
 
 		/* LCD Timing */
 		gb->counter.lcd_count += inst_cycles;
@@ -3388,7 +3423,9 @@ void __gb_step_cpu(struct gb_s *gb)
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
 			/* Next line */
-			gb->hram_io[IO_LY] = (gb->hram_io[IO_LY] + 1) % LCD_VERT_LINES;
+			gb->hram_io[IO_LY] = gb->hram_io[IO_LY] + 1;
+			if (gb->hram_io[IO_LY] == LCD_VERT_LINES)
+				gb->hram_io[IO_LY] = 0;
 
 			/* LYC Update */
 			if(gb->hram_io[IO_LY] == gb->hram_io[IO_LYC])
@@ -3499,23 +3536,55 @@ void gb_run_frame(struct gb_s *gb)
 		__gb_step_cpu(gb);
 }
 
-/**
- * Gets the size of the save file required for the ROM.
- */
+int gb_get_save_size_s(struct gb_s *gb, size_t *ram_size)
+{
+	const uint_fast16_t ram_size_location = 0x0149;
+	const uint_fast32_t ram_sizes[] =
+	{
+		/* 0,  2KiB,   8KiB,  32KiB,  128KiB,   64KiB */
+		0x00, 0x800, 0x2000, 0x8000, 0x20000, 0x10000
+	};
+	uint8_t ram_size_code = gb->gb_rom_read(gb, ram_size_location);
+
+	/* MBC2 always has 512 half-bytes of cart RAM.
+	 * This assumes that only the lower nibble of each byte is used; the
+	 * nibbles are not packed. */
+	if(gb->mbc == 2)
+	{
+		*ram_size = 0x200;
+		return 0;
+	}
+
+	/* Return -1 on invalid or unsupported RAM size. */
+	if(ram_size_code >= PEANUT_GB_ARRAYSIZE(ram_sizes))
+		return -1;
+
+	*ram_size = ram_sizes[ram_size_code];
+	return 0;
+}
+
+PGB_DEPRECATED("Does not return error code. Use gb_get_save_size_s instead.")
 uint_fast32_t gb_get_save_size(struct gb_s *gb)
 {
 	const uint_fast16_t ram_size_location = 0x0149;
 	const uint_fast32_t ram_sizes[] =
 	{
-		0x00, 0x800, 0x2000, 0x8000, 0x20000
+		/* 0,  2KiB,   8KiB,  32KiB,  128KiB,   64KiB */
+		0x00, 0x800, 0x2000, 0x8000, 0x20000, 0x10000
 	};
-	uint8_t ram_size = gb->gb_rom_read(gb, ram_size_location);
+	uint8_t ram_size_code = gb->gb_rom_read(gb, ram_size_location);
 
-	/* MBC2 always has 512 half-bytes of cart RAM. */
+	/* MBC2 always has 512 half-bytes of cart RAM.
+	 * This assumes that only the lower nibble of each byte is used; the
+	 * nibbles are not packed. */
 	if(gb->mbc == 2)
 		return 0x200;
 
-	return ram_sizes[ram_size];
+	/* Return 0 on invalid or unsupported RAM size. */
+	if(ram_size_code >= PEANUT_GB_ARRAYSIZE(ram_sizes))
+		return 0;
+
+	return ram_sizes[ram_size_code];
 }
 
 void gb_init_serial(struct gb_s *gb,
@@ -3597,6 +3666,7 @@ void gb_reset(struct gb_s *gb)
 	gb->counter.tima_count = 0;
 	gb->counter.serial_count = 0;
 	gb->counter.rtc_count = 0;
+	gb->counter.lcd_off_count = 0;
 
 	gb->direct.joypad = 0xFF;
 	gb->hram_io[IO_JOYP] = 0xCF;
@@ -3698,9 +3768,22 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 			return GB_INIT_CARTRIDGE_UNSUPPORTED;
 	}
 
-	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
 	gb->num_rom_banks_mask = num_rom_banks_mask[gb->gb_rom_read(gb, bank_count_location)] - 1;
+	gb->cart_ram = cart_ram[gb->gb_rom_read(gb, mbc_location)];
 	gb->num_ram_banks = num_ram_banks[gb->gb_rom_read(gb, ram_size_location)];
+
+	/* If the ROM says that it support RAM, but has 0 RAM banks, then
+	 * disable RAM reads from the cartridge. */
+	if(gb->cart_ram == 0 || gb->num_ram_banks == 0)
+	{
+		gb->cart_ram = 0;
+		gb->num_ram_banks = 0;
+	}
+
+	/* If MBC3 and number of ROM or RAM banks are larger than 128 or 8,
+	 * respectively, then select MBC3O mode. */
+	if(gb->mbc == 3)
+		gb->cart_is_mbc3O = gb->num_rom_banks_mask > 128 || gb->num_ram_banks > 4;
 
 	/* Note that MBC2 will appear to have no RAM banks, but it actually
 	 * always has 512 half-bytes of RAM. Hence, gb->num_ram_banks must be
@@ -3812,7 +3895,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 			     void *priv);
 
 /**
- * Executes the emulator and runs for one frame.
+ * Executes the emulator and runs for the duration of time equal to one frame.
  *
  * \param	An initialised emulator context. Must not be NULL.
  */
@@ -3878,8 +3961,24 @@ void gb_init_serial(struct gb_s *gb,
  * frontend to allocate enough memory for the Cart RAM.
  *
  * \param gb	An initialised emulator context. Must not be NULL.
+ * \param ram_size Pointer to size_t variable that will be set to the size of
+ *		the Cart RAM in bytes. Must not be NULL.
+ *		If the Cart RAM is not battery backed, this will be set to 0.
+ *		If the Cart RAM size is invalid or unknown, this will not be
+ *		set.
+ * \returns	0 on success, or -1 if the RAM size is invalid or unknown.
+ */
+int gb_get_save_size_s(struct gb_s *gb, size_t *ram_size);
+
+/**
+ * Deprecated. Use gb_get_save_size_s() instead.
+ * Obtains the save size of the game (size of the Cart RAM). Required by the
+ * frontend to allocate enough memory for the Cart RAM.
+ *
+ * \param gb	An initialised emulator context. Must not be NULL.
  * \returns	Size of the Cart RAM in bytes. 0 if Cartridge has not battery
  *		backed RAM.
+ *		0 is also returned on invalid or unknown RAM size.
  */
 uint_fast32_t gb_get_save_size(struct gb_s *gb);
 
